@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block subtitle %}Overview &amp; Statistics{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-sm font-medium text-gray-500">Total Extractions</span>
+      <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+        <i class="fa-solid fa-image text-blue-600 text-sm"></i>
+      </div>
+    </div>
+    <p class="text-2xl font-bold text-gray-900">--</p>
+    <p class="text-xs text-gray-400 mt-1">All time</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-sm font-medium text-gray-500">Candles Extracted</span>
+      <div class="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center">
+        <i class="fa-solid fa-chart-column text-green-600 text-sm"></i>
+      </div>
+    </div>
+    <p class="text-2xl font-bold text-gray-900">--</p>
+    <p class="text-xs text-gray-400 mt-1">Across all jobs</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-sm font-medium text-gray-500">Avg Quality Score</span>
+      <div class="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center">
+        <i class="fa-solid fa-star text-purple-600 text-sm"></i>
+      </div>
+    </div>
+    <p class="text-2xl font-bold text-gray-900">--</p>
+    <p class="text-xs text-gray-400 mt-1">Confidence rating</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-sm font-medium text-gray-500">Active Strategies</span>
+      <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+        <i class="fa-solid fa-robot text-amber-600 text-sm"></i>
+      </div>
+    </div>
+    <p class="text-2xl font-bold text-gray-900">--</p>
+    <p class="text-xs text-gray-400 mt-1">Trading strategies</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-base font-semibold text-gray-900">Recent Extractions</h3>
+      <a href="{{ url_for('charts.index') }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View all</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="pb-3 font-medium">File</th>
+            <th class="pb-3 font-medium">Status</th>
+            <th class="pb-3 font-medium">Candles</th>
+            <th class="pb-3 font-medium">Score</th>
+            <th class="pb-3 font-medium">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="py-4 text-gray-900" colspan="5">
+              <div class="flex flex-col items-center py-8 text-gray-400">
+                <i class="fa-solid fa-inbox text-3xl mb-2"></i>
+                <p class="text-sm">No extractions yet</p>
+                <a href="{{ url_for('charts.index') }}" class="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium">Upload your first chart</a>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <h3 class="text-base font-semibold text-gray-900 mb-4">Quick Actions</h3>
+    <div class="space-y-3">
+      <a href="{{ url_for('charts.index') }}" class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors group">
+        <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+          <i class="fa-solid fa-upload text-blue-600"></i>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">Upload Chart</p>
+          <p class="text-xs text-gray-500">Extract candle data from images</p>
+        </div>
+      </a>
+      <a href="{{ url_for('data.index') }}" class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors group">
+        <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+          <i class="fa-solid fa-download text-green-600"></i>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">Export Data</p>
+          <p class="text-xs text-gray-500">CSV or JSON format</p>
+        </div>
+      </a>
+      <a href="#" class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors group">
+        <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+          <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">AI Analysis</p>
+          <p class="text-xs text-gray-500">Run pattern recognition</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

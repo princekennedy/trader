@@ -1,0 +1,9 @@
+*.pyc
+__pycache__/
+instance/
+*.db
+.env
+node_modules/
+app/static/css/output.css
+uploads/*
+!uploads/.gitkeep

@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: trading-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      # Override .env values for Docker context
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///data/trading.db
+      - UPLOAD_FOLDER=/app/uploads
+    volumes:
+      # Persist SQLite database
+      - trading-data:/app/data
+      # Persist uploaded files
+      - trading-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # =====================================================
+  # Optional PostgreSQL for production use.
+  # To enable:
+  #   1. Uncomment the db service below.
+  #   2. Set   DATABASE_URL=postgresql://trading_user:trading_pass@db:5432/trading_db
+  #      in your .env (or environment section above).
+  #   3. Run: docker-compose up -d db
+  # =====================================================
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: trading-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: trading_user
+  #     POSTGRES_PASSWORD: trading_pass
+  #     POSTGRES_DB: trading_db
+  #   volumes:
+  #     - trading-postgres:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U trading_user -d trading_db"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  trading-data:
+  trading-uploads:
+  # trading-postgres:

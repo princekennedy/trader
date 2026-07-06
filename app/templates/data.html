@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Data Manager{% endblock %}
+{% block heading %}Data Manager{% endblock %}
+{% block subtitle %}Browse, export, and manage extracted trading data{% endblock %}
+{% block content %}
+<div class="flex gap-3 mb-6">
+  <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-file-csv mr-1.5 text-green-600"></i> Export CSV
+  </button>
+  <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-file-code mr-1.5 text-blue-600"></i> Export JSON
+  </button>
+  <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-rotate mr-1.5 text-purple-600"></i> Refresh
+  </button>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <h3 class="text-base font-semibold text-gray-900 mb-4">Extracted Datasets</h3>
+    {% if jobs %}
+    <div class="space-y-3">
+      {% for job in jobs %}
+      <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-file-chart-column text-gray-400"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900 truncate">{{ job.filename }}</p>
+            <p class="text-xs text-gray-500">{{ job.candle_count or 0 }} candles &middot; {{ job.symbol or 'N/A' }} &middot; {{ job.timeframe or 'N/A' }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0 ml-3">
+          <button class="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="View">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+          <button class="p-2 text-gray-400 hover:text-green-600 transition-colors" title="Download">
+            <i class="fa-solid fa-download"></i>
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center py-10 text-gray-400">
+      <i class="fa-solid fa-database text-4xl mb-3"></i>
+      <p class="text-sm font-medium">No datasets available</p>
+      <p class="text-xs mt-1">Extracted data will appear here</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <h3 class="text-base font-semibold text-gray-900 mb-4">Trading Strategies</h3>
+    {% if strategies %}
+    <div class="space-y-3">
+      {% for s in strategies %}
+      <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+            <i class="fa-solid fa-robot text-amber-600"></i>
+          </div>
+          <div>
+            <p class="text-sm font-medium text-gray-900">{{ s.name }}</p>
+            <p class="text-xs text-gray-500">{{ s.description[:60] }}{{ '...' if s.description|length > 60 }}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center py-10 text-gray-400">
+      <i class="fa-solid fa-flask text-4xl mb-3"></i>
+      <p class="text-sm font-medium">No strategies yet</p>
+      <p class="text-xs mt-1">Create strategies in the Analysis section</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

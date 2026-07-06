@@ -1,0 +1,12 @@
+{
+  "name": "trading",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "tailwind:dev": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch",
+    "tailwind:build": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}
