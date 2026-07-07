@@ -192,10 +192,27 @@ def job_detail(job_id):
     org = g.current_org
     job = ExtractionJob.query.filter_by(id=job_id, organization_id=org.id).first_or_404()
     candles_list = job.candles.order_by(Candle.index).all()
+    candles_data = [
+        {
+            "index": c.index,
+            "direction": c.direction,
+            "open": c.open,
+            "high": c.high,
+            "low": c.low,
+            "close": c.close,
+            "volume": c.volume,
+            "body": c.body,
+            "upper_wick": c.upper_wick,
+            "lower_wick": c.lower_wick,
+            "confidence": c.confidence,
+        }
+        for c in candles_list
+    ]
     return render_template(
         "job_detail.html",
         job=job,
         candles=candles_list,
+        candles_data=candles_data,
         storage_ok=storage_available(),
     )
 
