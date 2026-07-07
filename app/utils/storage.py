@@ -1,6 +1,7 @@
 import os
 import io
 import shutil
+from datetime import timedelta
 from typing import Optional
 from urllib.parse import quote
 
@@ -37,7 +38,7 @@ class MinioStorage:
 
     def get_url(self, object_name: str, expires: int = 3600) -> Optional[str]:
         try:
-            return self.client.presigned_get_object(self.bucket, object_name, expires=expires)
+            return self.client.presigned_get_object(self.bucket, object_name, expires=timedelta(seconds=expires))
         except S3Error:
             return None
 
@@ -105,6 +106,16 @@ class LocalStorage:
             f.write(data)
 
 
+def _clean_endpoint(raw: str) -> str:
+    raw = raw.strip()
+    for prefix in ("https://", "http://"):
+        if raw.startswith(prefix):
+            raw = raw[len(prefix):]
+    if "/" in raw:
+        raw = raw.split("/")[0]
+    return raw
+
+
 def init_storage(app):
     base_path = os.path.normpath(
         os.getenv("UPLOAD_FOLDER", os.path.join(app.root_path, "..", "uploads"))
@@ -113,7 +124,7 @@ def init_storage(app):
     os.makedirs(base_path, exist_ok=True)
 
     if MINIO_AVAILABLE:
-        endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+        endpoint = _clean_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
         access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
         secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
         bucket = os.getenv("MINIO_BUCKET", "trading-charts")

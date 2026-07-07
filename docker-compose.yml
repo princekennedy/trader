@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   web:
     build: .
@@ -11,61 +9,9 @@ services:
       - .env
     environment:
       - FLASK_ENV=production
-      - DATABASE_URL=postgresql://trading:trading@db:5432/trading
-      - UPLOAD_FOLDER=/app/uploads
-    volumes:
-      - trading-uploads:/app/uploads
-    depends_on:
-      minio:
-        condition: service_healthy
-      db:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-
-  # =====================================================
-  # MinIO – S3-compatible object storage
-  # =====================================================
-  minio:
-    image: minio/minio:latest
-    container_name: trading-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - trading-minio:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  db:
-    image: postgres:16-alpine
-    container_name: trading-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: trading
-      POSTGRES_PASSWORD: trading
-      POSTGRES_DB: trading
-    volumes:
-      - trading-postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  trading-uploads:
-  trading-minio:
-  trading-postgres:
