@@ -58,7 +58,7 @@
           <i class="fa-solid fa-chart-simple w-5 text-center text-sm"></i>
           <span>Pattern Scanner</span>
         </a>
-        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-600 hover:bg-sidebar-800 hover:text-white transition-colors">
+        <a href="{{ url_for('ai.index') }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('ai') else 'text-sidebar-600 hover:bg-sidebar-800 hover:text-white' }}">
           <i class="fa-solid fa-robot w-5 text-center text-sm"></i>
           <span>AI Analysis</span>
         </a>

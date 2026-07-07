@@ -3,7 +3,8 @@
 {% block heading %}Data Manager{% endblock %}
 {% block subtitle %}Browse, export, and manage extracted trading data{% endblock %}
 {% block content %}
-<div x-data="{ previewUrl: '', showPreview: false }" class="flex gap-3 mb-6">
+<div x-data="{ previewUrl: '', showPreview: false }">
+<div class="flex gap-3 mb-6">
   <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-file-csv mr-1.5 text-green-600"></i> Export CSV
   </button>
@@ -94,5 +95,6 @@
       <img :src="previewUrl" alt="Chart preview" class="w-full h-auto rounded-lg">
     </div>
   </div>
+</div>
 </div>
 {% endblock %}

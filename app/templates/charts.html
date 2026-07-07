@@ -84,6 +84,11 @@
                 <a href="{{ url_for('charts.job_detail', job_id=job.id) }}" class="text-gray-400 hover:text-primary-500 transition-colors mr-2" title="Details">
                   <i class="fa-solid fa-chart-simple"></i>
                 </a>
+                <form method="POST" action="{{ url_for('charts.reprocess_job', job_id=job.id) }}" class="inline mr-2">
+                  <button class="text-gray-400 hover:text-amber-500 transition-colors" title="Reprocess">
+                    <i class="fa-solid fa-rotate"></i>
+                  </button>
+                </form>
                 <form method="POST" action="{{ url_for('charts.delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?')" class="inline">
                   <button class="text-gray-400 hover:text-red-500 transition-colors">
                     <i class="fa-solid fa-trash-can"></i>

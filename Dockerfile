@@ -21,10 +21,29 @@ WORKDIR /app
 # Install runtime system dependencies (needed for OpenCV, Pillow, etc.)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libjpeg62-turbo \
-        libwebp7 \
         libglib2.0-0 \
         libgomp1 \
+        libjpeg62-turbo \
+        libwebp7 \
+        libxcb1 \
+        libxcb-shm0 \
+        libxcb-xfixes0 \
+        libxcb-shape0 \
+        libxcb-render0 \
+        libxcb-randr0 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-icccm4 \
+        libxcb-sync1 \
+        libxcb-xinerama0 \
+        libxcb-xkb1 \
+        libxcb-render-util0 \
+        libxkbcommon0 \
+        libxkbcommon-x11-0 \
+        libsm6 \
+        libice6 \
+        libxext6 \
+        libxrender1 \
         && \
     rm -rf /var/lib/apt/lists/*
 

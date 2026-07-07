@@ -8,3 +8,4 @@ opencv-python-headless==4.13.0.90
 numpy==2.1.1
 scipy==1.17.0
 minio==7.2.15
+ultralytics==8.3.100

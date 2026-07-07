@@ -185,6 +185,57 @@ def delete_job(job_id):
     return redirect(url_for("charts.index"))
 
 
+@charts_bp.route("/job/<int:job_id>/reprocess", methods=["POST"])
+def reprocess_job(job_id):
+    job = ExtractionJob.query.get_or_404(job_id)
+    if not job.object_name:
+        flash("No uploaded image to reprocess", "error")
+        return redirect(url_for("charts.job_detail", job_id=job_id))
+
+    if not EXTRACTOR_AVAILABLE:
+        flash("Extraction unavailable: missing dependencies", "error")
+        return redirect(url_for("charts.job_detail", job_id=job_id))
+
+    try:
+        Candle.query.filter_by(job_id=job.id).delete()
+        db.session.flush()
+
+        result = _extract_from_storage(job.object_name)
+
+        job.status = "completed" if result.candles else "failed"
+        job.candle_count = len(result.candles)
+        job.quality_score = result.quality_score
+
+        for i, cd in enumerate(result.candles):
+            candle = Candle(
+                job_id=job.id,
+                index=i,
+                direction=cd["direction"],
+                open=cd["open"],
+                high=cd["high"],
+                low=cd["low"],
+                close=cd["close"],
+                volume=cd.get("volume"),
+                body=cd["body"],
+                upper_wick=cd["upper_wick"],
+                lower_wick=cd["lower_wick"],
+                confidence=cd["confidence"],
+            )
+            db.session.add(candle)
+
+        db.session.commit()
+        flash(
+            f"Reprocessed: {len(result.candles)} candles (quality: {result.quality_score:.0%})",
+            "success",
+        )
+    except Exception as e:
+        job.status = "failed"
+        db.session.commit()
+        flash(f"Reprocess failed: {e}", "error")
+
+    return redirect(url_for("charts.job_detail", job_id=job_id))
+
+
 @charts_bp.route("/job/<int:job_id>/export")
 def export_job(job_id):
     job = ExtractionJob.query.get_or_404(job_id)
