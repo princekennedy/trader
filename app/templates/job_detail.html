@@ -9,12 +9,12 @@
 {% block content %}
 {% set preview_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
 {% set export_url = url_for('charts.export_job', job_id=job.id) %}
-<div x-data="{
+<div x-data='{
   ...window.chartView,
-  previewUrl: '{{ preview_url }}',
-  fetchUrl: '{{ export_url }}',
+  previewUrl: {{ preview_url|tojson }},
+  fetchUrl: {{ export_url|tojson }},
   candleData: {{ candles_data|tojson }}
-}">
+}'>
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 flex flex-col">
     {% include "_chart_tabs.html" %}

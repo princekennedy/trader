@@ -11,12 +11,13 @@
   ...window.chartView,
   showPreview: false,
 
-  openPreview(jobId, name) {
-    this.activeTab = 'image';
-    this.chartRendered = false;
-    this.previewUrl = '';
+  openPreview(url, jobId, name) {
+    this.previewUrl = url;
     this.candleData = [];
+    this.chartRendered = false;
+    this.activeTab = 'image';
     this.showPreview = true;
+    this.jobName = name;
     this.fetchUrl = '/data/api/job/' + jobId + '/candles';
     fetch(this.fetchUrl)
       .then(r => r.json())
@@ -54,7 +55,8 @@
             <td class="py-3 text-gray-600">{{ '%.0f%%'|format(job.quality_score * 100) if job.quality_score else '--' }}</td>
             <td class="py-3 text-gray-400 text-xs">{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '--' }}</td>
             <td class="py-3">
-              <button @click="openPreview({{ job.id }}, '{{ job.filename }}')" class="text-gray-400 hover:text-blue-500 transition-colors" title="Preview candles">
+              {% set image_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
+              <button @click="openPreview('{{ image_url }}', {{ job.id }}, '{{ job.filename }}')" class="text-gray-400 hover:text-blue-500 transition-colors" title="Preview candles">
                 <i class="fa-solid fa-eye"></i>
               </button>
             </td>

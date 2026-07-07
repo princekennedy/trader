@@ -21,6 +21,7 @@
     this.chartRendered = false;
     this.activeTab = 'image';
     this.showPreview = true;
+    this.jobName = name;
     this.fetchUrl = '/charts/job/' + jobId + '/export';
     fetch(this.fetchUrl)
       .then(r => r.json())
