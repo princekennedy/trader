@@ -27,7 +27,12 @@ def index():
             return redirect(url_for("ai.index"))
 
         data = file.read()
-        detections = detect_on_bytes(data)
+        try:
+            detections = detect_on_bytes(data)
+        except Exception as e:
+            current_app.logger.error("Detection error: %s", e)
+            flash("AI model error: the model does not support this image format. Try a different image.", "error")
+            return redirect(url_for("ai.index"))
         results_list = detections
 
         if storage_available():
