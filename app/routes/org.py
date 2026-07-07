@@ -2,7 +2,7 @@ import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session as flask_session
 from flask_login import current_user
 from app import db
-from app.models import Organization, User, user_organizations
+from app.models import Organization, User, Role, user_organizations, user_roles
 from app.utils.auth import login_required as auth_required
 
 org_bp = Blueprint("org", __name__, url_prefix="/org")
@@ -59,6 +59,14 @@ def create():
             user_id=current_user.id, organization_id=org.id, role="admin"
         )
         db.session.execute(stmt)
+
+        admin_role = Role.query.filter_by(slug="admin", is_system=True).first()
+        if admin_role:
+            db.session.execute(
+                user_roles.insert().values(
+                    user_id=current_user.id, role_id=admin_role.id, organization_id=org.id
+                )
+            )
         db.session.commit()
 
         flask_session["org_id"] = org.id
@@ -160,3 +168,57 @@ def remove_member(org_id, user_id):
     db.session.commit()
     flash("Member removed", "success")
     return redirect(url_for("org.settings", org_id=org_id))
+
+
+@org_bp.route("/<int:org_id>/edit", methods=["GET", "POST"])
+@auth_required
+def edit(org_id):
+    org = current_user.organizations.filter_by(id=org_id).first()
+    if not org:
+        flash("Organization not found", "error")
+        return redirect(url_for("org.select"))
+
+    if org.owner_id != current_user.id:
+        flash("Only the owner can edit the organization", "error")
+        return redirect(url_for("org.settings", org_id=org.id))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        description = request.form.get("description", "").strip()
+        if not name:
+            flash("Organization name is required", "error")
+            return render_template("org_edit.html", org=org)
+        org.name = name
+        org.description = description
+        _set_audit_updated(org)
+        db.session.commit()
+        flash("Organization updated!", "success")
+        return redirect(url_for("org.settings", org_id=org.id))
+
+    return render_template("org_edit.html", org=org)
+
+
+@org_bp.route("/<int:org_id>/delete", methods=["POST"])
+@auth_required
+def delete(org_id):
+    org = current_user.organizations.filter_by(id=org_id).first()
+    if not org:
+        flash("Organization not found", "error")
+        return redirect(url_for("org.select"))
+
+    if org.owner_id != current_user.id:
+        flash("Only the owner can delete the organization", "error")
+        return redirect(url_for("org.settings", org_id=org.id))
+
+    from flask import session as flask_session
+
+    stmt = user_organizations.delete().where(
+        user_organizations.c.organization_id == org.id,
+    )
+    db.session.execute(stmt)
+    db.session.delete(org)
+    db.session.commit()
+
+    flask_session.pop("org_id", None)
+    flash("Organization deleted", "success")
+    return redirect(url_for("org.select"))

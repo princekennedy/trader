@@ -35,7 +35,7 @@
 
     <div class="space-y-3">
       {% for org in organizations %}
-        <a href="{{ url_for('org.switch_org', org_id=org.id) }}" class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-primary-300 hover:shadow-sm transition-all">
+        <a href="{{ url_for('org.switch', org_id=org.id) }}" class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-primary-300 hover:shadow-sm transition-all">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
               <i class="fa-solid fa-building text-primary-600"></i>
@@ -51,7 +51,7 @@
     </div>
 
     <div class="mt-6 text-center">
-      <a href="{{ url_for('org.create_org') }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+      <a href="{{ url_for('org.create') }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
         <i class="fa-solid fa-plus mr-1"></i> Create New Organization
       </a>
     </div>

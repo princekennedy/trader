@@ -1,3 +1,4 @@
+import secrets
 from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -26,6 +27,19 @@ user_organizations = db.Table(
     db.Column("created_at", db.DateTime, server_default=db.func.now(), nullable=False),
 )
 
+role_permissions = db.Table(
+    "role_permissions",
+    db.Column("role_id", db.Integer, db.ForeignKey("roles.id"), primary_key=True),
+    db.Column("permission_id", db.Integer, db.ForeignKey("permissions.id"), primary_key=True),
+)
+
+user_roles = db.Table(
+    "user_roles",
+    db.Column("user_id", db.Integer, db.ForeignKey("users.id"), primary_key=True),
+    db.Column("role_id", db.Integer, db.ForeignKey("roles.id"), primary_key=True),
+    db.Column("organization_id", db.Integer, db.ForeignKey("organizations.id"), primary_key=True),
+)
+
 
 class User(UserMixin, db.Model, AuditMixin):
     __tablename__ = "users"
@@ -36,15 +50,42 @@ class User(UserMixin, db.Model, AuditMixin):
     password_hash = db.Column(db.String(256), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     last_login_at = db.Column(db.DateTime, nullable=True)
+    api_token = db.Column(db.String(64), unique=True, nullable=True, index=True)
 
     organizations = db.relationship("Organization", secondary=user_organizations, lazy="dynamic", overlaps="users")
     created_orgs = db.relationship("Organization", foreign_keys="Organization.owner_id", back_populates="owner", lazy="dynamic")
+    roles = db.relationship("Role", secondary=user_roles, lazy="dynamic", overlaps="users")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def generate_api_token(self):
+        self.api_token = secrets.token_hex(32)
+        return self.api_token
+
+    def regenerate_api_token(self):
+        return self.generate_api_token()
+
+    def has_permission(self, permission_slug, org_id=None):
+        if org_id is None:
+            from flask import g
+            org = g.get("current_org")
+            if not org:
+                return False
+            org_id = org.id
+        org = Organization.query.get(org_id)
+        if org and org.owner_id == self.id:
+            return True
+        for role in self.roles.filter(user_roles.c.organization_id == org_id).all():
+            if role.is_system:
+                return True
+            for perm in role.permissions:
+                if perm.slug == permission_slug:
+                    return True
+        return False
 
 
 class Organization(db.Model, AuditMixin):
@@ -60,6 +101,36 @@ class Organization(db.Model, AuditMixin):
     users = db.relationship("User", secondary=user_organizations, lazy="dynamic", overlaps="organizations")
     extraction_jobs = db.relationship("ExtractionJob", back_populates="organization", lazy="dynamic")
     strategies = db.relationship("Strategy", back_populates="organization", lazy="dynamic")
+    roles = db.relationship("Role", back_populates="organization", lazy="dynamic")
+
+
+class Permission(db.Model):
+    __tablename__ = "permissions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    description = db.Column(db.Text, default="", nullable=False)
+    module = db.Column(db.String(50), default="", nullable=False, index=True)
+
+
+class Role(db.Model, AuditMixin):
+    __tablename__ = "roles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(100), nullable=False, index=True)
+    description = db.Column(db.Text, default="", nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=True)
+    is_system = db.Column(db.Boolean, default=False, nullable=False)
+
+    organization = db.relationship("Organization", back_populates="roles")
+    permissions = db.relationship("Permission", secondary=role_permissions, lazy="dynamic")
+    users = db.relationship("User", secondary=user_roles, lazy="dynamic", overlaps="roles")
+
+    __table_args__ = (
+        db.UniqueConstraint("slug", "organization_id", name="uq_role_slug_org"),
+    )
 
 
 class ExtractionJob(db.Model, AuditMixin):

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block heading %}Users{% endblock %}
+{% block subtitle %}Manage users and roles for {{ org.name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl">
+  <div class="flex items-center justify-between mb-4">
+    <p class="text-sm text-gray-500">{{ members|length }} member{{ 's' if members|length != 1 }}</p>
+    <a href="{{ url_for('org.settings', org_id=org.id) }}" class="px-3 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-user-plus mr-1"></i> Add Member
+    </a>
+  </div>
+
+  <div class="space-y-2">
+    {% for member_tuple in members %}
+      {% set m = member_tuple[0] %}
+      {% set roles_list = user_role_map.get(m.id, []) %}
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-bold">{{ m.name[:1]|upper }}</div>
+            <div>
+              <p class="text-sm font-medium text-gray-900">{{ m.name }}</p>
+              <p class="text-xs text-gray-500">{{ m.email }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex flex-wrap gap-1">
+              {% for role in roles_list %}
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ 'bg-purple-100 text-purple-700' if role.is_system else 'bg-blue-100 text-blue-700' }}">{{ role.name }}</span>
+              {% endfor %}
+            </div>
+            <a href="{{ url_for('users.manage_roles', org_id=org.id, user_id=m.id) }}" class="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+              <i class="fa-solid fa-pen"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

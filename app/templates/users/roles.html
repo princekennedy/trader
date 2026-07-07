@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Manage Roles{% endblock %}
+{% block heading %}Manage Roles for {{ target_user.name }}{% endblock %}
+{% block subtitle %}{{ org.name }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl">
+  <form method="POST" class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <p class="text-sm text-gray-600 mb-4">Select the roles for <strong>{{ target_user.name }}</strong> in this organization:</p>
+    <div class="space-y-2">
+      {% for role in available_roles %}
+        <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer">
+          <input type="checkbox" name="role_ids" value="{{ role.id }}"
+                 {{ 'checked' if role.id in current_role_ids else '' }}
+                 class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+          <div>
+            <p class="text-sm font-medium text-gray-900">{{ role.name }}</p>
+            <p class="text-xs text-gray-500">{{ role.description or 'No description' }}</p>
+          </div>
+        </label>
+      {% endfor %}
+    </div>
+    <div class="flex items-center gap-3 mt-6">
+      <button type="submit" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">
+        Save Roles
+      </button>
+      <a href="{{ url_for('users.list_users', org_id=org.id) }}" class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
