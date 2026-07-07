@@ -1,6 +1,6 @@
 import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session as flask_session
-from flask_login import login_required, current_user
+from flask_login import current_user
 from app import db
 from app.models import Organization, User, user_organizations
 from app.utils.auth import login_required as auth_required
