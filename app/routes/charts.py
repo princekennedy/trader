@@ -137,9 +137,18 @@ def uploaded_file(object_name):
         from app.utils.storage import LocalStorage
         if isinstance(storage, LocalStorage):
             fp = storage._resolve(object_name)
-            if os.path.isfile(fp):
-                mime, _ = mimetypes.guess_type(fp)
-                return send_file(fp, mimetype=mime or "image/png")
+            try:
+                return send_file(fp, mimetype=mimetypes.guess_type(fp)[0] or "image/png")
+            except FileNotFoundError:
+                current_app.logger.warning(f"Local file not found at {fp}, trying read from storage")
+                fp = os.path.normpath(os.path.join(
+                    current_app.config.get("UPLOAD_FOLDER", "").rstrip("/"),
+                    object_name.lstrip("/")
+                ))
+                try:
+                    return send_file(fp, mimetype=mimetypes.guess_type(fp)[0] or "image/png")
+                except FileNotFoundError:
+                    pass
 
     url = storage.get_url(object_name, expires=3600)
     if url and url.startswith("http"):

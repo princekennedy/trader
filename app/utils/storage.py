@@ -57,9 +57,9 @@ class MinioStorage:
 
 class LocalStorage:
     def __init__(self, base_path: str, serve_url_prefix: str = "/charts/uploads/"):
-        self.base_path = base_path
+        self.base_path = os.path.normpath(base_path)
         self.serve_url_prefix = serve_url_prefix
-        os.makedirs(base_path, exist_ok=True)
+        os.makedirs(self.base_path, exist_ok=True)
 
     def _resolve(self, object_name: str) -> str:
         safe = object_name.replace("..", "_").replace("/", os.sep)
@@ -106,7 +106,10 @@ class LocalStorage:
 
 
 def init_storage(app):
-    base_path = os.getenv("UPLOAD_FOLDER", os.path.join(app.root_path, "..", "uploads"))
+    base_path = os.path.normpath(
+        os.getenv("UPLOAD_FOLDER", os.path.join(app.root_path, "..", "uploads"))
+    )
+    app.config["UPLOAD_FOLDER"] = base_path
     os.makedirs(base_path, exist_ok=True)
 
     if MINIO_AVAILABLE:
