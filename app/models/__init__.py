@@ -6,6 +6,7 @@ class ExtractionJob(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
+    object_name = db.Column(db.String(500), default="")
     symbol = db.Column(db.String(20), default="")
     timeframe = db.Column(db.String(10), default="")
     status = db.Column(db.String(20), default="pending")

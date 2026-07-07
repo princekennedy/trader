@@ -35,6 +35,16 @@ class ChartExtractor:
             raise ValueError(f"Cannot read image: {image_path}")
         return self._process(img)
 
+    def extract_from_bytes(self, data: bytes) -> ExtractionResult:
+        arr = np.frombuffer(data, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Cannot decode image from bytes")
+        return self._process(img)
+
+    def extract_from_array(self, img: np.ndarray) -> ExtractionResult:
+        return self._process(img)
+
     def _process(self, img: np.ndarray) -> ExtractionResult:
         result = ExtractionResult()
         h, w = img.shape[:2]

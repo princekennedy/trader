@@ -7,3 +7,4 @@ python-dotenv==1.1.0
 opencv-python-headless==4.13.0.20250413
 numpy==2.1.1
 scipy==1.17.0
+minio==7.2.15

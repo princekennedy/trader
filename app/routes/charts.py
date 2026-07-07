@@ -1,12 +1,16 @@
 import os
 import json
+import uuid
+import tempfile
 from flask import (
     Blueprint, render_template, request, redirect,
-    url_for, flash, current_app, send_from_directory
+    url_for, flash, current_app, send_file
 )
 from werkzeug.utils import secure_filename
 from app import db
 from app.models import ExtractionJob, Candle
+from app.utils.storage import get_storage, storage_available
+
 try:
     from app.utils.extractor import ChartExtractor
     EXTRACTOR_AVAILABLE = True
@@ -17,10 +21,33 @@ except ImportError:
 charts_bp = Blueprint("charts", __name__, url_prefix="/charts")
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+CHART_PREFIX = "charts"
 
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _object_name(filename):
+    return f"{CHART_PREFIX}/{uuid.uuid4().hex}_{filename}"
+
+
+def _upload_to_storage(file_storage, filename):
+    storage = get_storage()
+    obj_name = _object_name(filename)
+    storage.upload_bytes(
+        file_storage.read(),
+        obj_name,
+        content_type=file_storage.content_type or "image/png",
+    )
+    return obj_name
+
+
+def _extract_from_storage(object_name):
+    storage = get_storage()
+    data = storage.download_bytes(object_name)
+    extractor = ChartExtractor()
+    return extractor.extract_from_bytes(data)
 
 
 @charts_bp.route("/", methods=["GET", "POST"])
@@ -35,17 +62,19 @@ def index():
             flash("File type not allowed", "error")
             return redirect(url_for("charts.index"))
 
-        filename = secure_filename(file.filename)
-        upload_path = current_app.config["UPLOAD_FOLDER"]
-        os.makedirs(upload_path, exist_ok=True)
-        filepath = os.path.join(upload_path, filename)
-        file.save(filepath)
+        if not storage_available():
+            flash("Storage unavailable: MinIO not configured", "error")
+            return redirect(url_for("charts.index"))
 
         symbol = request.form.get("symbol", "")
         timeframe = request.form.get("timeframe", "")
 
+        filename = secure_filename(file.filename)
+        object_name = _upload_to_storage(file, filename)
+
         job = ExtractionJob(
             filename=filename,
+            object_name=object_name,
             symbol=symbol,
             timeframe=timeframe,
             status="processing",
@@ -56,12 +85,11 @@ def index():
         if not EXTRACTOR_AVAILABLE:
             job.status = "failed"
             db.session.commit()
-            flash("Extraction unavailable: missing dependencies (opencv-python-headless)", "error")
+            flash("Extraction unavailable: missing dependencies", "error")
             return redirect(url_for("charts.index"))
 
         try:
-            extractor = ChartExtractor()
-            result = extractor.extract(filepath)
+            result = _extract_from_storage(object_name)
 
             job.status = "completed" if result.candles else "failed"
             job.candle_count = len(result.candles)
@@ -101,24 +129,46 @@ def index():
         return redirect(url_for("charts.index"))
 
     jobs = ExtractionJob.query.order_by(ExtractionJob.created_at.desc()).all()
-    return render_template("charts.html", jobs=jobs)
+    return render_template("charts.html", jobs=jobs, storage_ok=storage_available())
 
 
-@charts_bp.route("/uploads/<filename>")
-def uploaded_file(filename):
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename)
+@charts_bp.route("/uploads/<object_name>")
+def uploaded_file(object_name):
+    if not storage_available():
+        flash("Storage unavailable", "error")
+        return redirect(url_for("charts.index"))
+
+    url = get_storage().get_url(object_name, expires=3600)
+    if url:
+        return redirect(url)
+
+    data = get_storage().download_bytes(object_name)
+    return send_file(
+        io_bytes_io(data),
+        mimetype="image/png",
+        as_attachment=False,
+    )
 
 
 @charts_bp.route("/job/<int:job_id>")
 def job_detail(job_id):
     job = ExtractionJob.query.get_or_404(job_id)
-    candles = job.candles.order_by(Candle.index).all()
-    return render_template("job_detail.html", job=job, candles=candles)
+    candles_list = job.candles.order_by(Candle.index).all()
+    return render_template(
+        "job_detail.html",
+        job=job,
+        candles=candles_list,
+        storage_ok=storage_available(),
+    )
 
 
 @charts_bp.route("/job/<int:job_id>/delete", methods=["POST"])
 def delete_job(job_id):
     job = ExtractionJob.query.get_or_404(job_id)
+
+    if storage_available() and job.object_name:
+        get_storage().delete(job.object_name)
+
     Candle.query.filter_by(job_id=job.id).delete()
     db.session.delete(job)
     db.session.commit()
@@ -129,7 +179,7 @@ def delete_job(job_id):
 @charts_bp.route("/job/<int:job_id>/export")
 def export_job(job_id):
     job = ExtractionJob.query.get_or_404(job_id)
-    candles = job.candles.order_by(Candle.index).all()
+    candles_list = job.candles.order_by(Candle.index).all()
     data = {
         "metadata": {
             "filename": job.filename,
@@ -151,7 +201,7 @@ def export_job(job_id):
                 "upper_wick": c.upper_wick,
                 "lower_wick": c.lower_wick,
             }
-            for c in candles
+            for c in candles_list
         ],
     }
     return current_app.response_class(
@@ -159,3 +209,8 @@ def export_job(job_id):
         mimetype="application/json",
         headers={"Content-Disposition": f"attachment; filename=job_{job.id}.json"},
     )
+
+
+def io_bytes_io(data: bytes):
+    import io
+    return io.BytesIO(data)
