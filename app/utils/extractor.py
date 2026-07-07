@@ -26,6 +26,11 @@ class ChartExtractor:
     RED_UPPER2 = np.array([180, 255, 255])
 
     def __init__(self, price_base: float = 100.0, price_variation: float = 0.10):
+        if cv2 is None:
+            raise RuntimeError(
+                "OpenCV (cv2) is not available. "
+                "Install opencv-python-headless to enable chart extraction."
+            )
         self.price_base = price_base
         self.price_variation = price_variation
 
