@@ -1,15 +1,17 @@
-import io
-import json
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, g
+from flask_login import login_required
 from werkzeug.utils import secure_filename
 from app.utils.detector import detect_on_bytes
 from app.utils.storage import get_storage, storage_available
+from app.utils.auth import org_required
 from app.routes.charts import _object_name, _upload_to_storage, allowed_file
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/ai")
 
 
 @ai_bp.route("/", methods=["GET", "POST"])
+@login_required
+@org_required
 def index():
     results_list = []
     preview_url = None

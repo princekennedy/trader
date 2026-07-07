@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Organization | Trading Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' } } } } }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+</head>
+<body class="h-full flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <div class="w-12 h-12 rounded-xl bg-primary-500 flex items-center justify-center mx-auto mb-3">
+        <i class="fa-solid fa-chart-line text-white text-lg"></i>
+      </div>
+      <h1 class="text-xl font-bold text-gray-900">Select Organization</h1>
+      <p class="text-sm text-gray-500 mt-1">Choose an organization to work with</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for category, message in messages %}
+            <div class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ 'bg-green-50 text-green-800' if category == 'success' else 'bg-red-50 text-red-800' }}">
+              <i class="fa-solid {{ 'fa-check-circle' if category == 'success' else 'fa-exclamation-circle' }}"></i>
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="space-y-3">
+      {% for org in organizations %}
+        <a href="{{ url_for('org.switch_org', org_id=org.id) }}" class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-primary-300 hover:shadow-sm transition-all">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
+              <i class="fa-solid fa-building text-primary-600"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-900">{{ org.name }}</p>
+              <p class="text-xs text-gray-500">{{ org.description or 'No description' }}</p>
+            </div>
+            <i class="fa-solid fa-chevron-right text-gray-300 ml-auto"></i>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="mt-6 text-center">
+      <a href="{{ url_for('org.create_org') }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+        <i class="fa-solid fa-plus mr-1"></i> Create New Organization
+      </a>
+    </div>
+  </div>
+</body>
+</html>

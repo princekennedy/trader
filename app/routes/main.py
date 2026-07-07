@@ -1,19 +1,29 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, g
+from flask_login import login_required, current_user
 from app.models import ExtractionJob, Candle, Strategy
+from app.utils.auth import org_required
 
 main_bp = Blueprint("main", __name__)
 
 
 @main_bp.route("/")
+@login_required
+@org_required
 def dashboard():
-    total_jobs = ExtractionJob.query.count()
-    total_candles = Candle.query.count()
-    completed = ExtractionJob.query.filter_by(status="completed").count()
-    strategies = Strategy.query.count()
+    org = g.current_org
+
+    total_jobs = ExtractionJob.query.filter_by(organization_id=org.id).count()
+    total_candles = Candle.query.join(ExtractionJob).filter(
+        ExtractionJob.organization_id == org.id
+    ).count()
+    completed = ExtractionJob.query.filter_by(
+        organization_id=org.id, status="completed"
+    ).count()
+    strategies = Strategy.query.filter_by(organization_id=org.id).count()
 
     recent_jobs = (
         ExtractionJob.query
-        .filter_by(status="completed")
+        .filter_by(organization_id=org.id, status="completed")
         .order_by(ExtractionJob.created_at.desc())
         .limit(5)
         .all()
@@ -24,6 +34,7 @@ def dashboard():
         result = ExtractionJob.query.with_entities(
             ExtractionJob.quality_score
         ).filter(
+            ExtractionJob.organization_id == org.id,
             ExtractionJob.status == "completed",
             ExtractionJob.quality_score.isnot(None)
         ).all()
@@ -41,5 +52,7 @@ def dashboard():
 
 
 @main_bp.route("/settings")
+@login_required
+@org_required
 def settings():
     return render_template("settings.html")

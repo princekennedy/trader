@@ -1,14 +1,24 @@
 import os
 import tempfile
-from flask import Flask
+from flask import Flask, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_login import LoginManager
 from dotenv import load_dotenv
 
 load_dotenv()
 
 db = SQLAlchemy()
 migrate = Migrate()
+login_manager = LoginManager()
+login_manager.login_view = "auth.login"
+login_manager.login_message_category = "info"
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    from app.models import User
+    return User.query.get(int(user_id))
 
 
 def create_app():
@@ -16,8 +26,9 @@ def create_app():
 
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev")
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "DATABASE_URL", "sqlite:///trading.db"
+        "DATABASE_URL", "postgresql://trading:trading@localhost:5432/trading"
     )
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
     upload_folder = os.getenv(
@@ -31,6 +42,7 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
+    login_manager.init_app(app)
 
     from app.utils.storage import init_storage
     init_storage(app)
@@ -38,7 +50,15 @@ def create_app():
     from app.routes import register_blueprints
     register_blueprints(app)
 
-    with app.app_context():
-        db.create_all()
+    @app.before_request
+    def load_current_org():
+        from flask import session as flask_session
+        from flask_login import current_user
+        org_id = flask_session.get("org_id")
+        if current_user.is_authenticated and org_id:
+            org = current_user.organizations.filter_by(id=org_id).first()
+            g.current_org = org
+        else:
+            g.current_org = None
 
     return app

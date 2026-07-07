@@ -5,12 +5,14 @@ import uuid
 import mimetypes
 from flask import (
     Blueprint, render_template, request, redirect,
-    url_for, flash, current_app, send_file
+    url_for, flash, current_app, send_file, g
 )
+from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app import db
 from app.models import ExtractionJob, Candle
 from app.utils.storage import get_storage, storage_available
+from app.utils.auth import org_required
 
 try:
     from app.utils.extractor import ChartExtractor
@@ -51,8 +53,22 @@ def _extract_from_storage(object_name):
     return extractor.extract_from_bytes(data)
 
 
+def _set_audit_fields(record):
+    if current_user.is_authenticated:
+        record.created_by_id = current_user.id
+
+
+def _set_audit_updated(record):
+    if current_user.is_authenticated:
+        record.updated_by_id = current_user.id
+
+
 @charts_bp.route("/", methods=["GET", "POST"])
+@login_required
+@org_required
 def index():
+    org = g.current_org
+
     if request.method == "POST":
         file = request.files.get("chart_image")
         if not file or not file.filename:
@@ -70,17 +86,21 @@ def index():
         object_name = _upload_to_storage(file, filename)
 
         job = ExtractionJob(
+            organization_id=org.id,
             filename=filename,
             object_name=object_name,
             symbol=symbol,
             timeframe=timeframe,
             status="processing",
         )
+        _set_audit_fields(job)
         db.session.add(job)
         db.session.commit()
 
         if not EXTRACTOR_AVAILABLE:
             job.status = "failed"
+            job.error_message = "Extraction dependencies not available"
+            _set_audit_updated(job)
             db.session.commit()
             flash("Extraction unavailable: missing dependencies", "error")
             return redirect(url_for("charts.index"))
@@ -95,6 +115,7 @@ def index():
                 job.symbol = symbol
             if timeframe:
                 job.timeframe = timeframe
+            _set_audit_updated(job)
 
             for i, cd in enumerate(result.candles):
                 candle = Candle(
@@ -111,6 +132,7 @@ def index():
                     lower_wick=cd["lower_wick"],
                     confidence=cd["confidence"],
                 )
+                _set_audit_fields(candle)
                 db.session.add(candle)
 
             db.session.commit()
@@ -120,12 +142,16 @@ def index():
             )
         except Exception as e:
             job.status = "failed"
+            job.error_message = str(e)
+            _set_audit_updated(job)
             db.session.commit()
             flash(f"Extraction failed: {e}", "error")
 
         return redirect(url_for("charts.index"))
 
-    jobs = ExtractionJob.query.order_by(ExtractionJob.created_at.desc()).all()
+    jobs = ExtractionJob.query.filter_by(organization_id=org.id).order_by(
+        ExtractionJob.created_at.desc()
+    ).all()
     return render_template("charts.html", jobs=jobs, storage_ok=storage_available())
 
 
@@ -140,7 +166,7 @@ def uploaded_file(object_name):
             try:
                 return send_file(fp, mimetype=mimetypes.guess_type(fp)[0] or "image/png")
             except FileNotFoundError:
-                current_app.logger.warning(f"Local file not found at {fp}, trying read from storage")
+                current_app.logger.warning(f"Local file not found at {fp}")
                 fp = os.path.normpath(os.path.join(
                     current_app.config.get("UPLOAD_FOLDER", "").rstrip("/"),
                     object_name.lstrip("/")
@@ -160,8 +186,11 @@ def uploaded_file(object_name):
 
 
 @charts_bp.route("/job/<int:job_id>")
+@login_required
+@org_required
 def job_detail(job_id):
-    job = ExtractionJob.query.get_or_404(job_id)
+    org = g.current_org
+    job = ExtractionJob.query.filter_by(id=job_id, organization_id=org.id).first_or_404()
     candles_list = job.candles.order_by(Candle.index).all()
     return render_template(
         "job_detail.html",
@@ -172,8 +201,11 @@ def job_detail(job_id):
 
 
 @charts_bp.route("/job/<int:job_id>/delete", methods=["POST"])
+@login_required
+@org_required
 def delete_job(job_id):
-    job = ExtractionJob.query.get_or_404(job_id)
+    org = g.current_org
+    job = ExtractionJob.query.filter_by(id=job_id, organization_id=org.id).first_or_404()
 
     if storage_available() and job.object_name:
         get_storage().delete(job.object_name)
@@ -186,8 +218,11 @@ def delete_job(job_id):
 
 
 @charts_bp.route("/job/<int:job_id>/reprocess", methods=["POST"])
+@login_required
+@org_required
 def reprocess_job(job_id):
-    job = ExtractionJob.query.get_or_404(job_id)
+    org = g.current_org
+    job = ExtractionJob.query.filter_by(id=job_id, organization_id=org.id).first_or_404()
     if not job.object_name:
         flash("No uploaded image to reprocess", "error")
         return redirect(url_for("charts.job_detail", job_id=job_id))
@@ -205,6 +240,7 @@ def reprocess_job(job_id):
         job.status = "completed" if result.candles else "failed"
         job.candle_count = len(result.candles)
         job.quality_score = result.quality_score
+        _set_audit_updated(job)
 
         for i, cd in enumerate(result.candles):
             candle = Candle(
@@ -221,6 +257,7 @@ def reprocess_job(job_id):
                 lower_wick=cd["lower_wick"],
                 confidence=cd["confidence"],
             )
+            _set_audit_fields(candle)
             db.session.add(candle)
 
         db.session.commit()
@@ -230,6 +267,8 @@ def reprocess_job(job_id):
         )
     except Exception as e:
         job.status = "failed"
+        job.error_message = str(e)
+        _set_audit_updated(job)
         db.session.commit()
         flash(f"Reprocess failed: {e}", "error")
 
@@ -237,8 +276,11 @@ def reprocess_job(job_id):
 
 
 @charts_bp.route("/job/<int:job_id>/export")
+@login_required
+@org_required
 def export_job(job_id):
-    job = ExtractionJob.query.get_or_404(job_id)
+    org = g.current_org
+    job = ExtractionJob.query.filter_by(id=job_id, organization_id=org.id).first_or_404()
     candles_list = job.candles.order_by(Candle.index).all()
     data = {
         "metadata": {
@@ -269,6 +311,3 @@ def export_job(job_id):
         mimetype="application/json",
         headers={"Content-Disposition": f"attachment; filename=job_{job.id}.json"},
     )
-
-
-

@@ -67,6 +67,18 @@
           <span>Backtest</span>
         </a>
 
+        <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-600 mt-6 mb-2">Organization</p>
+        {% if g.current_org %}
+          <a href="{{ url_for('org.settings', org_id=g.current_org.id) }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('org') else 'text-sidebar-600 hover:bg-sidebar-800 hover:text-white' }}">
+            <i class="fa-solid fa-building w-5 text-center text-sm"></i>
+            <span>{{ g.current_org.name }}</span>
+          </a>
+          <a href="{{ url_for('org.select') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-600 hover:bg-sidebar-800 hover:text-white transition-colors">
+            <i class="fa-solid fa-arrow-right-arrow-from-bracket w-5 text-center text-sm"></i>
+            <span>Switch Org</span>
+          </a>
+        {% endif %}
+
         <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-600 mt-6 mb-2">System</p>
         <a href="{{ url_for('main.settings') }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint == 'main.settings' else 'text-sidebar-600 hover:bg-sidebar-800 hover:text-white' }}">
           <i class="fa-solid fa-gear w-5 text-center text-sm"></i>
@@ -76,14 +88,14 @@
 
       <div class="border-t border-sidebar-700 p-4">
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold">U</div>
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold">{{ current_user.name[:1]|upper if current_user.is_authenticated else 'U' }}</div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-white truncate">User</p>
-            <p class="text-xs text-sidebar-600 truncate">Trader</p>
+            <p class="text-sm font-medium text-white truncate">{{ current_user.name if current_user.is_authenticated else 'Guest' }}</p>
+            <p class="text-xs text-sidebar-600 truncate">{{ g.current_org.name if g.current_org else 'No organization' }}</p>
           </div>
-          <button class="text-sidebar-600 hover:text-white transition-colors">
+          <a href="{{ url_for('auth.logout') }}" class="text-sidebar-600 hover:text-white transition-colors">
             <i class="fa-solid fa-right-from-bracket text-sm"></i>
-          </button>
+          </a>
         </div>
       </div>
     </div>
