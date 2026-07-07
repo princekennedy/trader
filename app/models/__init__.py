@@ -186,3 +186,16 @@ class Strategy(db.Model, AuditMixin):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
     organization = db.relationship("Organization", back_populates="strategies")
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = "password_reset_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    token = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+
+    user = db.relationship("User", uselist=False)

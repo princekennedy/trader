@@ -4,6 +4,7 @@ from flask_login import current_user
 from app import db
 from app.models import Organization, User, Role, user_organizations, user_roles
 from app.utils.auth import login_required as auth_required
+from app.utils.email import send_member_added_email
 
 org_bp = Blueprint("org", __name__, url_prefix="/org")
 
@@ -144,6 +145,7 @@ def add_member(org_id):
     )
     db.session.execute(stmt)
     db.session.commit()
+    send_member_added_email(user, org.name, current_user.name)
     flash(f"Added {user.name} as {role}", "success")
     return redirect(url_for("org.settings", org_id=org_id))
 
