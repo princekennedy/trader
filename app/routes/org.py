@@ -2,7 +2,7 @@ import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session as flask_session
 from flask_login import current_user
 from app import db
-from app.models import Organization, User, Role, user_organizations, user_roles
+from app.models import Organization, User, Role, Permission, user_organizations, user_roles
 from app.utils.auth import login_required as auth_required
 from app.utils.email import send_member_added_email
 
@@ -224,3 +224,41 @@ def delete(org_id):
     flask_session.pop("org_id", None)
     flash("Organization deleted", "success")
     return redirect(url_for("org.select"))
+
+
+@org_bp.route("/<int:org_id>/manage")
+@auth_required
+def manage(org_id):
+    org = current_user.organizations.filter_by(id=org_id).first_or_404()
+
+    members = db.session.query(User, user_organizations.c.role).join(
+        user_organizations, User.id == user_organizations.c.user_id
+    ).filter(
+        user_organizations.c.organization_id == org.id
+    ).all()
+
+    user_role_map = {}
+    for m, _ in members:
+        assigned = db.session.query(Role).join(
+            user_roles, Role.id == user_roles.c.role_id
+        ).filter(
+            user_roles.c.user_id == m.id,
+            user_roles.c.organization_id == org.id,
+        ).all()
+        user_role_map[m.id] = assigned
+
+    roles = Role.query.filter(
+        (Role.organization_id == org.id) | (Role.is_system == True)
+    ).order_by(Role.is_system.desc(), Role.name).all()
+
+    permissions = Permission.query.order_by(Permission.module, Permission.name).all()
+
+    return render_template(
+        "org_manage.html",
+        org=org,
+        members=members,
+        user_role_map=user_role_map,
+        roles=roles,
+        permissions=permissions,
+        is_owner=org.owner_id == current_user.id,
+    )

@@ -90,21 +90,9 @@
 
                 <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-500 mt-6 mb-2">Organization</p>
                 {% if g.current_org %}
-                <a href="{{ url_for('org.settings', org_id=g.current_org.id) }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('org') and 'roles' not in request.endpoint and 'users' not in request.endpoint else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
+                <a href="{{ url_for('org.manage', org_id=g.current_org.id) }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint == 'org.manage' or request.endpoint == 'roles.list_roles' or request.endpoint == 'roles.list_permissions' or request.endpoint == 'users.list_users' or request.endpoint == 'users.manage_roles' or request.endpoint == 'org.edit' else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
                     <i class="fa-solid fa-building w-5 text-center text-sm"></i>
                     <span>{{ g.current_org.name }}</span>
-                </a>
-                <a href="{{ url_for('roles.list_roles', org_id=g.current_org.id) }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('roles') else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
-                    <i class="fa-solid fa-lock w-5 text-center text-sm"></i>
-                    <span>Roles</span>
-                </a>
-                <a href="{{ url_for('users.list_users', org_id=g.current_org.id) }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('users') else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
-                    <i class="fa-solid fa-users w-5 text-center text-sm"></i>
-                    <span>Users</span>
-                </a>
-                <a href="{{ url_for('org.edit', org_id=g.current_org.id) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-400 hover:bg-sidebar-800 hover:text-white transition-colors">
-                    <i class="fa-solid fa-pen-to-square w-5 text-center text-sm"></i>
-                    <span>Edit Org</span>
                 </a>
                 <a href="{{ url_for('org.create') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-400 hover:bg-sidebar-800 hover:text-white transition-colors">
                     <i class="fa-solid fa-plus-circle w-5 text-center text-sm"></i>

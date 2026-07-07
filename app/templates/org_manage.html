@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Manage {{ org.name }}{% endblock %}
+{% block heading %}Organization{% endblock %}
+{% block subtitle %}{{ org.name }}{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Org Details -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-base font-semibold text-gray-900">
+        <i class="fa-solid fa-building mr-1.5 text-primary-500"></i> Details
+      </h3>
+      {% if is_owner %}
+      <a href="{{ url_for('org.edit', org_id=org.id) }}" class="text-sm text-primary-600 hover:text-primary-700">
+        <i class="fa-solid fa-pen mr-1"></i> Edit
+      </a>
+      {% endif %}
+    </div>
+    <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+      <div>
+        <dt class="text-gray-500">Name</dt>
+        <dd class="text-gray-900 font-medium">{{ org.name }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-500">Description</dt>
+        <dd class="text-gray-900">{{ org.description or '--' }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-500">Created</dt>
+        <dd class="text-gray-900">{{ org.created_at.strftime('%Y-%m-%d') if org.created_at else '--' }}</dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- Roles -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-base font-semibold text-gray-900">
+        <i class="fa-solid fa-lock mr-1.5 text-amber-500"></i> Roles
+      </h3>
+      <div class="flex gap-2">
+        <a href="{{ url_for('roles.list_permissions', org_id=org.id) }}" class="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+          <i class="fa-solid fa-key mr-1"></i> Permissions
+        </a>
+        <a href="{{ url_for('roles.create_role', org_id=org.id) }}" class="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">
+          <i class="fa-solid fa-plus mr-1"></i> New Role
+        </a>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="pb-2 font-medium">Name</th>
+            <th class="pb-2 font-medium">Type</th>
+            <th class="pb-2 font-medium">Permissions</th>
+            <th class="pb-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for role in roles %}
+          <tr class="border-b border-gray-50 text-gray-700">
+            <td class="py-2.5 font-medium">{{ role.name }}</td>
+            <td class="py-2.5">
+              {% if role.is_system %}
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">System</span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Custom</span>
+              {% endif %}
+            </td>
+            <td class="py-2.5">
+              <div class="flex flex-wrap gap-1">
+                {% for perm in role.permissions %}
+                  <span class="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">{{ perm.name }}</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="py-2.5 text-right whitespace-nowrap">
+              {% if role.organization_id == org.id %}
+                <a href="{{ url_for('roles.edit_role', org_id=org.id, role_id=role.id) }}" class="px-2 py-1 border border-gray-300 text-gray-500 text-xs rounded hover:bg-gray-50 transition-colors">
+                  <i class="fa-solid fa-pen"></i>
+                </a>
+                <form method="POST" action="{{ url_for('roles.delete_role', org_id=org.id, role_id=role.id) }}" class="inline" onsubmit="return confirm('Delete this role?')">
+                  <button type="submit" class="px-2 py-1 border border-red-200 text-red-500 text-xs rounded hover:bg-red-50 transition-colors">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Permissions -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-base font-semibold text-gray-900">
+        <i class="fa-solid fa-key mr-1.5 text-green-500"></i> Permissions
+      </h3>
+      <span class="text-xs text-gray-500">{{ permissions|length }} total</span>
+    </div>
+    {% set modules = permissions|map(attribute='module')|unique|list %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for module in modules %}
+      <div>
+        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ module }}</h4>
+        <div class="space-y-1">
+          {% for perm in permissions if perm.module == module %}
+          <div class="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+            <span class="text-sm text-gray-700">{{ perm.name }}</span>
+            <code class="text-xs text-gray-400">{{ perm.slug }}</code>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Users -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-base font-semibold text-gray-900">
+        <i class="fa-solid fa-users mr-1.5 text-blue-500"></i> Members
+      </h3>
+      <span class="text-xs text-gray-500">{{ members|length }} member{{ 's' if members|length != 1 }}</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="pb-2 font-medium">User</th>
+            <th class="pb-2 font-medium">Roles</th>
+            <th class="pb-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member_tuple in members %}
+            {% set m = member_tuple[0] %}
+            {% set role = member_tuple[1] %}
+            {% set assigned_roles = user_role_map.get(m.id, []) %}
+            <tr class="border-b border-gray-50 text-gray-700">
+              <td class="py-2">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold">{{ m.name[:1]|upper }}</div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">{{ m.name }}</p>
+                    <p class="text-xs text-gray-500">{{ m.email }}</p>
+                  </div>
+                </div>
+              </td>
+              <td class="py-2">
+                <div class="flex flex-wrap gap-1">
+                  {% for r in assigned_roles %}
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ 'bg-purple-100 text-purple-700' if r.is_system else 'bg-blue-100 text-blue-700' }}">{{ r.name }}</span>
+                  {% endfor %}
+                  {% if not assigned_roles %}
+                    <span class="text-xs text-gray-400">No roles assigned</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td class="py-2 text-right whitespace-nowrap">
+                <a href="{{ url_for('users.manage_roles', org_id=org.id, user_id=m.id) }}" class="px-2 py-1 border border-gray-300 text-gray-500 text-xs rounded hover:bg-gray-50 transition-colors" title="Edit roles">
+                  <i class="fa-solid fa-pen"></i>
+                </a>
+                {% if is_owner and m.id != current_user.id %}
+                  <form method="POST" action="{{ url_for('org.remove_member', org_id=org.id, user_id=m.id) }}" class="inline" onsubmit="return confirm('Remove {{ m.name }} from this organization?')">
+                    <button type="submit" class="px-2 py-1 border border-red-200 text-red-500 text-xs rounded hover:bg-red-50 transition-colors" title="Remove member">
+                      <i class="fa-solid fa-user-minus"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if is_owner %}
+    <div class="mt-4 pt-4 border-t border-gray-100">
+      <form method="POST" action="{{ url_for('org.add_member', org_id=org.id) }}" class="flex items-end gap-3 max-w-md">
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Add Member by Email</label>
+          <input type="email" name="email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" placeholder="user@example.com">
+        </div>
+        <button type="submit" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors whitespace-nowrap">
+          <i class="fa-solid fa-plus mr-1"></i> Add
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Danger Zone -->
+  {% if is_owner %}
+  <div class="bg-white rounded-xl border border-red-200 p-5">
+    <h3 class="text-base font-semibold text-red-800 mb-2">
+      <i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Danger Zone
+    </h3>
+    <p class="text-sm text-gray-600 mb-4">Permanently delete this organization and all associated data.</p>
+    <form method="POST" action="{{ url_for('org.delete', org_id=org.id) }}" onsubmit="return confirm('Are you sure? This will delete ALL data for this organization. This cannot be undone!')">
+      <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
+        <i class="fa-solid fa-trash-can mr-1"></i> Delete Organization
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
