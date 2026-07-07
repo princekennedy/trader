@@ -6,7 +6,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
     <h3 class="text-base font-semibold text-gray-900 mb-4">Extracted Candles</h3>
-    {% if job.candles.count() > 0 %}
+    {% if candles|length > 0 %}
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
@@ -21,7 +21,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for c in job.candles.order_by('index') %}
+          {% for c in candles %}
           <tr class="border-b border-gray-50 text-gray-700">
             <td class="py-2">{{ c.index }}</td>
             <td class="py-2">

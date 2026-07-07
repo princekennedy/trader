@@ -7,7 +7,12 @@ from flask import (
 from werkzeug.utils import secure_filename
 from app import db
 from app.models import ExtractionJob, Candle
-from app.utils.extractor import ChartExtractor
+try:
+    from app.utils.extractor import ChartExtractor
+    EXTRACTOR_AVAILABLE = True
+except ImportError:
+    ChartExtractor = None
+    EXTRACTOR_AVAILABLE = False
 
 charts_bp = Blueprint("charts", __name__, url_prefix="/charts")
 
@@ -47,6 +52,12 @@ def index():
         )
         db.session.add(job)
         db.session.commit()
+
+        if not EXTRACTOR_AVAILABLE:
+            job.status = "failed"
+            db.session.commit()
+            flash("Extraction unavailable: missing dependencies (opencv-python-headless)", "error")
+            return redirect(url_for("charts.index"))
 
         try:
             extractor = ChartExtractor()
