@@ -7,39 +7,42 @@
 {% block subtitle %}{{ job.filename }}{% endblock %}
 {% block content %}
 {% set preview_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
-<div x-data='{ candleData: {{ candles_data|tojson }} }' x-init="
-  activeTab = 'image';
-  previewUrl = '{{ preview_url }}';
-  chartRendered = false;
-  switchTab = (tab) => {
-    activeTab = tab;
-    if (tab === 'graph') $nextTick(() => renderChart());
-  };
-  renderChart = () => {
-    if (chartRendered || !candleData.length) return;
-    chartRendered = true;
-    const container = document.getElementById('lwc-container');
+<div x-data='{
+  candleData: {{ candles_data|tojson }},
+  activeTab: "image",
+  previewUrl: "{{ preview_url }}",
+  chartRendered: false,
+
+  switchTab(tab) {
+    this.activeTab = tab;
+    if (tab === "graph") this.$nextTick(() => this.renderChart());
+  },
+
+  renderChart() {
+    if (this.chartRendered || !this.candleData.length) return;
+    this.chartRendered = true;
+    const container = document.getElementById("lwc-container");
     if (!container) return;
-    container.innerHTML = '';
+    container.innerHTML = "";
     const chart = LightweightCharts.createChart(container, {
       height: 500,
-      layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
-      grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
-      rightPriceScale: { borderColor: '#e5e5e5' },
-      timeScale: { borderColor: '#e5e5e5', visible: false },
+      layout: { textColor: "#333", background: { type: "solid", color: "#fff" } },
+      grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
+      rightPriceScale: { borderColor: "#e5e5e5" },
+      timeScale: { borderColor: "#e5e5e5", visible: false },
       crosshair: { mode: 0 },
     });
     const series = chart.addCandlestickSeries({
-      upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
-      wickUpColor: '#16a34a', wickDownColor: '#dc2626',
+      upColor: "#16a34a", downColor: "#dc2626", borderUpColor: "#16a34a", borderDownColor: "#dc2626",
+      wickUpColor: "#16a34a", wickDownColor: "#dc2626",
     });
-    series.setData(candleData.map((c, i) => ({
+    series.setData(this.candleData.map((c, i) => ({
       time: i.toString(),
       open: c.open, high: c.high, low: c.low, close: c.close,
     })));
     chart.timeScale().fitContent();
-  };
-">
+  }
+}">
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 flex flex-col">
     <div class="flex-shrink-0 border-b border-gray-100">

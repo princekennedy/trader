@@ -24,6 +24,7 @@
       .then(r => r.json())
       .then(data => {
         this.candleData = data || [];
+        if (this.activeTab === 'graph') this.$nextTick(() => this.renderChart());
       });
   },
 
