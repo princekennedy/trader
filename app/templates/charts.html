@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block extra_head %}
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+{% include "_chart_component.html" %}
 {% endblock %}
 {% block title %}Chart Extraction{% endblock %}
 {% block heading %}Chart Extraction{% endblock %}
@@ -11,56 +12,19 @@
   {% set _ = ns.jobs_data.append({'id': job.id, 'filename': job.filename, 'symbol': job.symbol, 'timeframe': job.timeframe, 'status': job.status, 'candle_count': job.candle_count, 'quality_score': job.quality_score, 'created_at': job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '--', 'object_name': job.object_name, 'image_url': url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else ''}) %}
 {% endfor %}
 <div x-data="{
-  previewUrl: '',
+  ...window.chartView,
   showPreview: false,
-  activeTab: 'image',
-  candleData: [],
-  jobName: '',
-  chartRendered: false,
 
   openPreview(url, jobId, name) {
     this.previewUrl = url;
-    this.jobName = name;
+    this.candleData = [];
+    this.chartRendered = false;
     this.activeTab = 'image';
     this.showPreview = true;
-    this.chartRendered = false;
-    fetch('/charts/job/' + jobId + '/export')
+    this.fetchUrl = '/charts/job/' + jobId + '/export';
+    fetch(this.fetchUrl)
       .then(r => r.json())
-      .then(data => {
-        this.candleData = data.candles || [];
-        if (this.activeTab === 'graph') this.$nextTick(() => this.renderChart());
-      });
-  },
-
-  renderChart() {
-    if (this.chartRendered || !this.candleData.length) return;
-    this.chartRendered = true;
-    const container = document.getElementById('lwc-container');
-    if (!container) return;
-    container.innerHTML = '';
-    const chart = LightweightCharts.createChart(container, {
-      height: 500,
-      layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
-      grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
-      rightPriceScale: { borderColor: '#e5e5e5' },
-      timeScale: { borderColor: '#e5e5e5', visible: false },
-      crosshair: { mode: 0 },
-    });
-    const series = chart.addCandlestickSeries({
-      upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
-      wickUpColor: '#16a34a', wickDownColor: '#dc2626',
-    });
-    const ohlc = this.candleData.map((c, i) => ({
-      time: (i + 1) * 86400,
-      open: c.open, high: c.high, low: c.low, close: c.close,
-    }));
-    series.setData(ohlc);
-    chart.timeScale().fitContent();
-  },
-
-  switchTab(tab) {
-    this.activeTab = tab;
-    if (tab === 'graph') this.$nextTick(() => this.renderChart());
+      .then(data => { this.candleData = data.candles || []; });
   }
 }" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <div class="lg:col-span-1">

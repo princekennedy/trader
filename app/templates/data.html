@@ -1,142 +1,76 @@
 {% extends "base.html" %}
 {% block extra_head %}
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+{% include "_chart_component.html" %}
 {% endblock %}
 {% block title %}Data Manager{% endblock %}
 {% block heading %}Data Manager{% endblock %}
 {% block subtitle %}Browse, export, and manage extracted trading data{% endblock %}
 {% block content %}
 <div x-data="{
-  previewUrl: '',
+  ...window.chartView,
   showPreview: false,
-  activeTab: 'image',
-  candleData: [],
-  jobName: '',
-  chartRendered: false,
 
-  openPreview(url, jobId, name) {
-    this.previewUrl = url;
-    this.jobName = name;
+  openPreview(jobId, name) {
     this.activeTab = 'image';
-    this.showPreview = true;
     this.chartRendered = false;
-    fetch('/data/api/job/' + jobId + '/candles')
+    this.previewUrl = '';
+    this.candleData = [];
+    this.showPreview = true;
+    this.fetchUrl = '/data/api/job/' + jobId + '/candles';
+    fetch(this.fetchUrl)
       .then(r => r.json())
-      .then(data => {
-        this.candleData = data || [];
-        if (this.activeTab === 'graph') this.$nextTick(() => this.renderChart());
-      });
-  },
-
-  renderChart() {
-    if (this.chartRendered || !this.candleData.length) return;
-    this.chartRendered = true;
-    const container = document.getElementById('lwc-container');
-    if (!container) return;
-    container.innerHTML = '';
-    const chart = LightweightCharts.createChart(container, {
-      height: 500,
-      layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
-      grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
-      rightPriceScale: { borderColor: '#e5e5e5' },
-      timeScale: { borderColor: '#e5e5e5', visible: false },
-      crosshair: { mode: 0 },
-    });
-    const series = chart.addCandlestickSeries({
-      upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
-      wickUpColor: '#16a34a', wickDownColor: '#dc2626',
-    });
-    const ohlc = this.candleData.map((c, i) => ({
-      time: (i + 1) * 86400,
-      open: c.open, high: c.high, low: c.low, close: c.close,
-    }));
-    series.setData(ohlc);
-    chart.timeScale().fitContent();
-  },
-
-  switchTab(tab) {
-    this.activeTab = tab;
-    if (tab === 'graph') this.$nextTick(() => this.renderChart());
+      .then(data => { this.candleData = data || []; });
   }
-}">
-<div class="flex gap-3 mb-6">
-  <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-    <i class="fa-solid fa-file-csv mr-1.5 text-green-600"></i> Export CSV
-  </button>
-  <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-    <i class="fa-solid fa-file-code mr-1.5 text-blue-600"></i> Export JSON
-  </button>
-  <button onclick="window.location.reload()" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-    <i class="fa-solid fa-rotate mr-1.5 text-purple-600"></i> Refresh
-  </button>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+}" class="space-y-6">
+  {% if jobs %}
   <div class="bg-white rounded-xl border border-gray-200 p-5">
-    <h3 class="text-base font-semibold text-gray-900 mb-4">Extracted Datasets</h3>
-    {% if jobs %}
-    <div class="space-y-3">
-      {% for job in jobs %}
-      <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
-            <i class="fa-solid fa-file-chart-column text-gray-400"></i>
-          </div>
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">{{ job.filename }}</p>
-            <p class="text-xs text-gray-500">{{ job.candle_count or 0 }} candles &middot; {{ job.symbol or 'N/A' }} &middot; {{ job.timeframe or 'N/A' }}</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0 ml-3">
-          {% if job.object_name %}
-          <button @click="openPreview('{{ url_for('charts.uploaded_file', object_name=job.object_name) }}', {{ job.id }}, '{{ job.filename }}')" class="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="View">
-            <i class="fa-solid fa-eye"></i>
-          </button>
-          {% endif %}
-          <a href="{{ url_for('charts.export_job', job_id=job.id) }}" class="p-2 text-gray-400 hover:text-green-600 transition-colors" title="Download JSON">
-            <i class="fa-solid fa-download"></i>
-          </a>
-        </div>
-      </div>
-      {% endfor %}
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-base font-semibold text-gray-900">All Jobs</h3>
+      <span class="text-xs text-gray-500">{{ jobs|length }} job(s)</span>
     </div>
-    {% else %}
-    <div class="flex flex-col items-center py-10 text-gray-400">
-      <i class="fa-solid fa-database text-4xl mb-3"></i>
-      <p class="text-sm font-medium">No datasets available</p>
-      <p class="text-xs mt-1">Extracted data will appear here</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="pb-3 font-medium">ID</th>
+            <th class="pb-3 font-medium">File</th>
+            <th class="pb-3 font-medium">Symbol</th>
+            <th class="pb-3 font-medium">Timeframe</th>
+            <th class="pb-3 font-medium">Candles</th>
+            <th class="pb-3 font-medium">Quality</th>
+            <th class="pb-3 font-medium">Date</th>
+            <th class="pb-3 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+            <td class="py-3 text-gray-400 text-xs font-mono">{{ job.id }}</td>
+            <td class="py-3 text-gray-900 font-medium">{{ job.filename }}</td>
+            <td class="py-3 text-gray-600">{{ job.symbol or '--' }}</td>
+            <td class="py-3 text-gray-600">{{ job.timeframe or '--' }}</td>
+            <td class="py-3 text-gray-600">{{ job.candle_count or 0 }}</td>
+            <td class="py-3 text-gray-600">{{ '%.0f%%'|format(job.quality_score * 100) if job.quality_score else '--' }}</td>
+            <td class="py-3 text-gray-400 text-xs">{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '--' }}</td>
+            <td class="py-3">
+              <button @click="openPreview({{ job.id }}, '{{ job.filename }}')" class="text-gray-400 hover:text-blue-500 transition-colors" title="Preview candles">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    {% endif %}
   </div>
-
-  <div class="bg-white rounded-xl border border-gray-200 p-5">
-    <h3 class="text-base font-semibold text-gray-900 mb-4">Trading Strategies</h3>
-    {% if strategies %}
-    <div class="space-y-3">
-      {% for s in strategies %}
-      <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
-            <i class="fa-solid fa-robot text-amber-600"></i>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-900">{{ s.name }}</p>
-            <p class="text-xs text-gray-500">{{ s.description[:60] }}{{ '...' if s.description|length > 60 }}</p>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="flex flex-col items-center py-10 text-gray-400">
-      <i class="fa-solid fa-flask text-4xl mb-3"></i>
-      <p class="text-sm font-medium">No strategies yet</p>
-      <p class="text-xs mt-1">Create strategies in the Analysis section</p>
-    </div>
-    {% endif %}
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-10 text-center">
+    <i class="fa-solid fa-database text-5xl text-gray-200 mb-4"></i>
+    <p class="text-gray-500">No extraction data found.</p>
   </div>
-</div>
+  {% endif %}
 
-{% include "modals/job_preview.html" %}
+  {% include "modals/job_preview.html" %}
 </div>
 {% endblock %}

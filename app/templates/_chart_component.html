@@ -1,0 +1,57 @@
+<script>
+window.chartView = {
+  activeTab: 'image',
+  previewUrl: '',
+  candleData: [],
+  chartRendered: false,
+  fetchUrl: '',
+
+  switchTab(tab) {
+    this.activeTab = tab;
+    if (tab === 'graph') this.loadChart();
+  },
+
+  loadChart() {
+    if (this.chartRendered) return;
+    if (this.candleData.length) {
+      this.renderChart();
+    } else if (this.fetchUrl) {
+      fetch(this.fetchUrl)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => {
+          this.candleData = data.candles || data || [];
+          this.renderChart();
+        })
+        .catch(e => { console.error('Chart fetch error:', e); this.chartRendered = true; });
+    }
+  },
+
+  renderChart() {
+    if (this.chartRendered || !this.candleData.length) return;
+    if (typeof LightweightCharts === 'undefined') return;
+    this.chartRendered = true;
+    const el = document.getElementById('lwc-container');
+    if (!el) return;
+    el.innerHTML = '';
+    try {
+      const chart = LightweightCharts.createChart(el, {
+        height: 500,
+        layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
+        grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+        rightPriceScale: { borderColor: '#e5e5e5' },
+        timeScale: { borderColor: '#e5e5e5', visible: false },
+        crosshair: { mode: 0 },
+      });
+      const series = chart.addCandlestickSeries({
+        upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
+        wickUpColor: '#16a34a', wickDownColor: '#dc2626',
+      });
+      series.setData(this.candleData.map((c, i) => ({
+        time: (i + 1) * 86400,
+        open: c.open, high: c.high, low: c.low, close: c.close,
+      })));
+      chart.timeScale().fitContent();
+    } catch (e) { console.error('Chart render error:', e); }
+  }
+};
+</script>

@@ -4,85 +4,12 @@
     <div class="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
       <h3 class="text-sm font-semibold text-gray-900">
         <i class="fa-solid fa-file-chart-column mr-1.5 text-primary-500"></i>
-        <span x-text="jobName"></span>
+        <span x-text="jobName || 'Preview'"></span>
       </h3>
       <button @click="showPreview=false" class="text-gray-400 hover:text-gray-600 transition-colors">
         <i class="fa-solid fa-xmark text-xl"></i>
       </button>
     </div>
-
-    <div class="flex-shrink-0 border-b border-gray-100">
-      <nav class="flex px-4 gap-1">
-        <button @click="switchTab('image')" :class="activeTab === 'image' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
-          <i class="fa-solid fa-image mr-1.5"></i>Original Image
-        </button>
-        <button @click="switchTab('dataset')" :class="activeTab === 'dataset' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
-          <i class="fa-solid fa-table mr-1.5"></i>Dataset
-        </button>
-        <button @click="switchTab('graph')" :class="activeTab === 'graph' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
-          <i class="fa-solid fa-chart-line mr-1.5"></i>Graph
-        </button>
-      </nav>
-    </div>
-
-    <div class="flex-1 overflow-auto p-4">
-      <div x-show="activeTab === 'image'">
-        <img :src="previewUrl" alt="Chart preview" class="w-full h-auto rounded-lg border border-gray-100">
-      </div>
-
-      <div x-show="activeTab === 'dataset'" x-cloak>
-        <template x-if="candleData.length">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-left text-gray-500 border-b border-gray-100">
-                  <th class="pb-2 font-medium">#</th>
-                  <th class="pb-2 font-medium">Direction</th>
-                  <th class="pb-2 font-medium">Open</th>
-                  <th class="pb-2 font-medium">High</th>
-                  <th class="pb-2 font-medium">Low</th>
-                  <th class="pb-2 font-medium">Close</th>
-                  <th class="pb-2 font-medium">Body</th>
-                  <th class="pb-2 font-medium">Upper</th>
-                  <th class="pb-2 font-medium">Lower</th>
-                  <th class="pb-2 font-medium">Conf.</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="c in candleData" :key="c.index">
-                  <tr class="border-b border-gray-50 text-gray-700 text-xs">
-                    <td class="py-1.5" x-text="c.index"></td>
-                    <td class="py-1.5">
-                      <span :class="c.direction === 'bullish' ? 'text-green-600' : 'text-red-600'" class="inline-flex items-center gap-1 text-xs font-medium">
-                        <i :class="c.direction === 'bullish' ? 'fa-arrow-up' : 'fa-arrow-down'" class="fa-solid"></i>
-                        <span x-text="c.direction"></span>
-                      </span>
-                    </td>
-                    <td class="py-1.5 font-mono" x-text="c.open.toFixed(2)"></td>
-                    <td class="py-1.5 font-mono" x-text="c.high.toFixed(2)"></td>
-                    <td class="py-1.5 font-mono" x-text="c.low.toFixed(2)"></td>
-                    <td class="py-1.5 font-mono" x-text="c.close.toFixed(2)"></td>
-                    <td class="py-1.5 font-mono" x-text="c.body.toFixed(2)"></td>
-                    <td class="py-1.5 font-mono" x-text="c.upper_wick.toFixed(2)"></td>
-                    <td class="py-1.5 font-mono" x-text="c.lower_wick.toFixed(2)"></td>
-                    <td class="py-1.5" x-text="c.confidence?.toFixed(2) || '--'"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </template>
-        <template x-if="!candleData.length">
-          <div class="flex flex-col items-center py-10 text-gray-400">
-            <i class="fa-solid fa-database text-4xl mb-3"></i>
-            <p class="text-sm font-medium">No candle data</p>
-          </div>
-        </template>
-      </div>
-
-      <div x-show="activeTab === 'graph'" x-cloak>
-        <div id="lwc-container" class="w-full"></div>
-      </div>
-    </div>
+    {% include "_chart_tabs.html" %}
   </div>
 </div>
