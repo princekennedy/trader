@@ -1,7 +1,9 @@
+_cv2_import_error = None
 try:
     import cv2
-except ImportError:
+except Exception as _cv2_exc:
     cv2 = None
+    _cv2_import_error = str(_cv2_exc)
 
 import numpy as np
 from dataclasses import dataclass, field
@@ -29,7 +31,7 @@ class ChartExtractor:
         if cv2 is None:
             raise RuntimeError(
                 "OpenCV (cv2) is not available. "
-                "Install opencv-python-headless to enable chart extraction."
+                f"Import error: {_cv2_import_error}"
             )
         self.price_base = price_base
         self.price_variation = price_variation

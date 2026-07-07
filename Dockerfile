@@ -12,31 +12,26 @@ RUN npm install && \
     npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --minify
 
 # ============================================
-# Stage 2: Python dependencies
-# ============================================
-FROM python:3.12-slim AS python-builder
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn==23.0.0
-
-# ============================================
-# Stage 3: Final production image
+# Stage 2: Final production image
 # ============================================
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install runtime system dependencies (if any needed, e.g. for Pillow)
+# Install runtime system dependencies (needed for OpenCV, Pillow, etc.)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libjpeg62-turbo libwebp7 && \
+    apt-get install -y --no-install-recommends \
+        libjpeg62-turbo \
+        libwebp7 \
+        libglib2.0-0 \
+        libgomp1 \
+        && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy Python site-packages from builder
-COPY --from=python-builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=python-builder /usr/local/bin /usr/local/bin
+# Install Python dependencies directly (avoids multi-stage .so issues)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir gunicorn==23.0.0
 
 # Copy application code
 COPY run.py ./
@@ -44,6 +39,9 @@ COPY app/ ./app/
 
 # Copy pre-built Tailwind CSS from builder
 COPY --from=tailwind-builder /app/app/static/css/output.css ./app/static/css/output.css
+
+# Copy migrations for flask db upgrade
+COPY migrations/ ./migrations/
 
 # Create data and uploads directories
 RUN mkdir -p /app/data /app/uploads
@@ -58,5 +56,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 5000
 
 # Run migrations then start Gunicorn
-COPY migrations/ ./migrations/
 CMD flask db upgrade && gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 run:app
