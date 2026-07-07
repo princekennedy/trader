@@ -25,7 +25,7 @@
   </div>
 
   <div x-show="activeTab === 'dataset'" x-cloak>
-    <template x-if="candleData.length">
+    <template x-if="candleData && candleData.length">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
@@ -66,7 +66,7 @@
         </table>
       </div>
     </template>
-    <template x-if="!candleData.length">
+    <template x-if="!candleData || !candleData.length">
       <div class="flex flex-col items-center py-10 text-gray-400">
         <i class="fa-solid fa-database text-4xl mb-3"></i>
         <p class="text-sm font-medium">No candle data</p>
@@ -75,10 +75,10 @@
   </div>
 
   <div x-show="activeTab === 'graph'" x-cloak>
-    <div x-show="!candleData.length" class="flex flex-col items-center py-10 text-gray-400">
+    <div x-show="!candleData || !candleData.length" class="flex flex-col items-center py-10 text-gray-400">
       <i class="fa-solid fa-chart-line text-4xl mb-3"></i>
       <p class="text-sm font-medium" x-text="chartRendered ? 'No candle data available' : 'Loading chart data...'"></p>
     </div>
-    <div id="lwc-container" class="w-full" x-show="candleData.length"></div>
+    <div id="lwc-container" class="w-full" x-show="candleData && candleData.length"></div>
   </div>
 </div>

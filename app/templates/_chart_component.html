@@ -5,6 +5,7 @@ window.chartView = {
   candleData: [],
   chartRendered: false,
   fetchUrl: '',
+  _chartInstance: null,
 
   switchTab(tab) {
     this.activeTab = tab;
@@ -13,25 +14,32 @@ window.chartView = {
 
   loadChart() {
     if (this.chartRendered) return;
-    if (this.candleData.length) {
-      this.renderChart();
-    } else if (this.fetchUrl) {
-      fetch(this.fetchUrl)
-        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(data => {
-          this.candleData = data.candles || data || [];
-          this.renderChart();
-        })
-        .catch(e => { console.error('Chart fetch error:', e); this.chartRendered = true; });
+    if (!this.candleData || !this.candleData.length) {
+      if (this.fetchUrl) {
+        fetch(this.fetchUrl)
+          .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(data => {
+            this.candleData = data.candles || data || [];
+            if (this.candleData && this.candleData.length) this.renderChart();
+          })
+          .catch(e => { console.error('Chart fetch error:', e); this.chartRendered = true; });
+      }
+      return;
     }
+    setTimeout(() => this.renderChart(), 50);
   },
 
   renderChart() {
-    if (this.chartRendered || !this.candleData.length) return;
+    if (this.chartRendered) return;
+    if (!this.candleData || !this.candleData.length) return;
     if (typeof LightweightCharts === 'undefined') return;
-    this.chartRendered = true;
     const el = document.getElementById('lwc-container');
     if (!el) return;
+    this.chartRendered = true;
+    if (this._chartInstance) {
+      try { this._chartInstance.remove(); } catch(e) {}
+      this._chartInstance = null;
+    }
     el.innerHTML = '';
     try {
       const chart = LightweightCharts.createChart(el, {
@@ -51,6 +59,7 @@ window.chartView = {
         open: c.open, high: c.high, low: c.low, close: c.close,
       })));
       chart.timeScale().fitContent();
+      this._chartInstance = chart;
     } catch (e) { console.error('Chart render error:', e); }
   }
 };
