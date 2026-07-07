@@ -1,6 +1,8 @@
 import os
 import io
+import shutil
 from typing import Optional
+from urllib.parse import quote
 
 try:
     from minio import Minio
@@ -12,23 +14,9 @@ except ImportError:
     MINIO_AVAILABLE = False
 
 
-class Storage:
-    def __init__(
-        self,
-        endpoint: str,
-        access_key: str,
-        secret_key: str,
-        bucket: str,
-        region: str = "us-east-1",
-        secure: bool = True,
-    ):
-        self.client = Minio(
-            endpoint,
-            access_key=access_key,
-            secret_key=secret_key,
-            region=region,
-            secure=secure,
-        )
+class MinioStorage:
+    def __init__(self, endpoint, access_key, secret_key, bucket, region="us-east-1", secure=True):
+        self.client = Minio(endpoint, access_key=access_key, secret_key=secret_key, region=region, secure=secure)
         self.bucket = bucket
         self._ensure_bucket()
 
@@ -37,21 +25,7 @@ class Storage:
             self.client.make_bucket(self.bucket)
 
     def upload_bytes(self, data: bytes, object_name: str, content_type: str = "application/octet-stream") -> str:
-        self.client.put_object(
-            self.bucket,
-            object_name,
-            io.BytesIO(data),
-            length=len(data),
-            content_type=content_type,
-        )
-        return object_name
-
-    def upload_file(self, filepath: str, object_name: str, content_type: str = "application/octet-stream") -> str:
-        with open(filepath, "rb") as f:
-            size = os.fstat(f.fileno()).st_size
-            self.client.put_object(
-                self.bucket, object_name, f, length=size, content_type=content_type
-            )
+        self.client.put_object(self.bucket, object_name, io.BytesIO(data), length=len(data), content_type=content_type)
         return object_name
 
     def download_bytes(self, object_name: str) -> bytes:
@@ -60,9 +34,6 @@ class Storage:
         response.close()
         response.release_conn()
         return data
-
-    def download_file(self, object_name: str, filepath: str):
-        self.client.fget_object(self.bucket, object_name, filepath)
 
     def get_url(self, object_name: str, expires: int = 3600) -> Optional[str]:
         try:
@@ -83,40 +54,89 @@ class Storage:
         except S3Error:
             pass
 
-    def list(self, prefix: str = "") -> list:
-        objects = self.client.list_objects(self.bucket, prefix=prefix, recursive=True)
-        return [o.object_name for o in objects]
+
+class LocalStorage:
+    def __init__(self, base_path: str, serve_url_prefix: str = "/charts/uploads/"):
+        self.base_path = base_path
+        self.serve_url_prefix = serve_url_prefix
+        os.makedirs(base_path, exist_ok=True)
+
+    def _resolve(self, object_name: str) -> str:
+        safe = object_name.replace("..", "_").replace("/", os.sep)
+        return os.path.normpath(os.path.join(self.base_path, safe))
+
+    def _ensure_dir(self, filepath: str):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+    def upload_bytes(self, data: bytes, object_name: str, content_type: str = "application/octet-stream") -> str:
+        fp = self._resolve(object_name)
+        self._ensure_dir(fp)
+        with open(fp, "wb") as f:
+            f.write(data)
+        return object_name
+
+    def download_bytes(self, object_name: str) -> bytes:
+        fp = self._resolve(object_name)
+        if not os.path.isfile(fp):
+            raise FileNotFoundError(f"Object not found: {object_name}")
+        with open(fp, "rb") as f:
+            return f.read()
+
+    def get_url(self, object_name: str, expires: int = 3600) -> Optional[str]:
+        return f"{self.serve_url_prefix}{quote(object_name)}"
+
+    def exists(self, object_name: str) -> bool:
+        return os.path.isfile(self._resolve(object_name))
+
+    def delete(self, object_name: str):
+        fp = self._resolve(object_name)
+        if os.path.isfile(fp):
+            os.remove(fp)
+
+    def upload_file(self, filepath: str, object_name: str, content_type: str = "application/octet-stream") -> str:
+        fp = self._resolve(object_name)
+        self._ensure_dir(fp)
+        shutil.copy2(filepath, fp)
+        return object_name
+
+    def download_file(self, object_name: str, filepath: str):
+        data = self.download_bytes(object_name)
+        with open(filepath, "wb") as f:
+            f.write(data)
 
 
 def init_storage(app):
-    if not MINIO_AVAILABLE:
-        app.logger.warning("MinIO package not installed, storage disabled")
-        app.config["STORAGE"] = None
-        app.config["STORAGE_AVAILABLE"] = False
-        return
+    base_path = os.getenv("UPLOAD_FOLDER", os.path.join(app.root_path, "..", "uploads"))
+    os.makedirs(base_path, exist_ok=True)
 
-    endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-    secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-    bucket = os.getenv("MINIO_BUCKET", "trading-charts")
-    region = os.getenv("MINIO_REGION", "us-east-1")
-    secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+    if MINIO_AVAILABLE:
+        endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+        access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+        secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+        bucket = os.getenv("MINIO_BUCKET", "trading-charts")
+        region = os.getenv("MINIO_REGION", "us-east-1")
+        secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
 
-    try:
-        storage = Storage(
-            endpoint=endpoint,
-            access_key=access_key,
-            secret_key=secret_key,
-            bucket=bucket,
-            region=region,
-            secure=secure,
-        )
-        app.config["STORAGE"] = storage
-        app.config["STORAGE_AVAILABLE"] = True
-    except Exception as e:
-        app.logger.warning(f"MinIO unavailable: {e}")
-        app.config["STORAGE"] = None
-        app.config["STORAGE_AVAILABLE"] = False
+        try:
+            storage = MinioStorage(
+                endpoint=endpoint, access_key=access_key, secret_key=secret_key,
+                bucket=bucket, region=region, secure=secure,
+            )
+            app.config["STORAGE"] = storage
+            app.config["STORAGE_AVAILABLE"] = True
+            app.config["STORAGE_BACKEND"] = "minio"
+            app.logger.info("Storage: MinIO")
+            return
+        except Exception as e:
+            app.logger.warning(f"MinIO unavailable, falling back to local filesystem: {e}")
+    else:
+        app.logger.info("MinIO package not installed, using local filesystem")
+
+    storage = LocalStorage(base_path=base_path, serve_url_prefix="/charts/uploads/")
+    app.config["STORAGE"] = storage
+    app.config["STORAGE_AVAILABLE"] = True
+    app.config["STORAGE_BACKEND"] = "local"
+    app.logger.info(f"Storage: local filesystem ({base_path})")
 
 
 def get_storage():

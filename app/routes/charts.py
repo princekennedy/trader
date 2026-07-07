@@ -1,7 +1,8 @@
 import os
+import io
 import json
 import uuid
-import tempfile
+import mimetypes
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, current_app, send_file
@@ -60,10 +61,6 @@ def index():
 
         if not allowed_file(file.filename):
             flash("File type not allowed", "error")
-            return redirect(url_for("charts.index"))
-
-        if not storage_available():
-            flash("Storage unavailable: MinIO not configured", "error")
             return redirect(url_for("charts.index"))
 
         symbol = request.form.get("symbol", "")
@@ -132,22 +129,25 @@ def index():
     return render_template("charts.html", jobs=jobs, storage_ok=storage_available())
 
 
-@charts_bp.route("/uploads/<object_name>")
+@charts_bp.route("/uploads/<path:object_name>")
 def uploaded_file(object_name):
-    if not storage_available():
-        flash("Storage unavailable", "error")
-        return redirect(url_for("charts.index"))
+    storage = get_storage()
 
-    url = get_storage().get_url(object_name, expires=3600)
-    if url:
+    if current_app.config.get("STORAGE_BACKEND") == "local":
+        from app.utils.storage import LocalStorage
+        if isinstance(storage, LocalStorage):
+            fp = storage._resolve(object_name)
+            if os.path.isfile(fp):
+                mime, _ = mimetypes.guess_type(fp)
+                return send_file(fp, mimetype=mime or "image/png")
+
+    url = storage.get_url(object_name, expires=3600)
+    if url and url.startswith("http"):
         return redirect(url)
 
-    data = get_storage().download_bytes(object_name)
-    return send_file(
-        io_bytes_io(data),
-        mimetype="image/png",
-        as_attachment=False,
-    )
+    data = storage.download_bytes(object_name)
+    mime = mimetypes.guess_type(object_name)[0] or "image/png"
+    return send_file(io.BytesIO(data), mimetype=mime)
 
 
 @charts_bp.route("/job/<int:job_id>")
@@ -211,6 +211,4 @@ def export_job(job_id):
     )
 
 
-def io_bytes_io(data: bytes):
-    import io
-    return io.BytesIO(data)
+
