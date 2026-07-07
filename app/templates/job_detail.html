@@ -8,14 +8,24 @@
 {% block content %}
 {% set preview_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
 <div x-data='{
-  candleData: {{ candles_data|tojson }},
   activeTab: "image",
   previewUrl: "{{ preview_url }}",
+  candleData: [],
   chartRendered: false,
 
   switchTab(tab) {
     this.activeTab = tab;
-    if (tab === "graph") this.$nextTick(() => this.renderChart());
+    if (tab === "graph") this.fetchGraphData();
+  },
+
+  fetchGraphData() {
+    if (this.chartRendered) return;
+    fetch("/charts/job/{{ job.id }}/export")
+      .then(r => r.json())
+      .then(data => {
+        this.candleData = data.candles || [];
+        this.$nextTick(() => this.renderChart());
+      });
   },
 
   renderChart() {
