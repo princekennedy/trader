@@ -50,11 +50,13 @@ RUN mkdir -p /app/data /app/uploads
 
 # Environment variables (defaults – override via docker-compose or -e flags)
 ENV FLASK_ENV=production
+ENV FLASK_APP=run.py
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 5000
 
-# Use Gunicorn as production WSGI server
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "run:app"]
+# Run migrations then start Gunicorn
+COPY migrations/ ./migrations/
+CMD flask db upgrade && gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 run:app
