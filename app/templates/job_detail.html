@@ -21,36 +21,40 @@
   fetchGraphData() {
     if (this.chartRendered) return;
     fetch("/charts/job/{{ job.id }}/export")
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(data => {
         this.candleData = data.candles || [];
-        this.$nextTick(() => this.renderChart());
-      });
+        this.renderChart();
+      })
+      .catch(e => { console.error("Graph fetch error:", e); this.chartRendered = true; });
   },
 
   renderChart() {
     if (this.chartRendered || !this.candleData.length) return;
+    if (typeof LightweightCharts === "undefined") return;
     this.chartRendered = true;
     const container = document.getElementById("lwc-container");
     if (!container) return;
     container.innerHTML = "";
-    const chart = LightweightCharts.createChart(container, {
-      height: 500,
-      layout: { textColor: "#333", background: { type: "solid", color: "#fff" } },
-      grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
-      rightPriceScale: { borderColor: "#e5e5e5" },
-      timeScale: { borderColor: "#e5e5e5", visible: false },
-      crosshair: { mode: 0 },
-    });
-    const series = chart.addCandlestickSeries({
-      upColor: "#16a34a", downColor: "#dc2626", borderUpColor: "#16a34a", borderDownColor: "#dc2626",
-      wickUpColor: "#16a34a", wickDownColor: "#dc2626",
-    });
-    series.setData(this.candleData.map((c, i) => ({
-      time: i.toString(),
-      open: c.open, high: c.high, low: c.low, close: c.close,
-    })));
-    chart.timeScale().fitContent();
+    try {
+      const chart = LightweightCharts.createChart(container, {
+        height: 500,
+        layout: { textColor: "#333", background: { type: "solid", color: "#fff" } },
+        grid: { vertLines: { color: "#f0f0f0" }, horzLines: { color: "#f0f0f0" } },
+        rightPriceScale: { borderColor: "#e5e5e5" },
+        timeScale: { borderColor: "#e5e5e5", visible: false },
+        crosshair: { mode: 0 },
+      });
+      const series = chart.addCandlestickSeries({
+        upColor: "#16a34a", downColor: "#dc2626", borderUpColor: "#16a34a", borderDownColor: "#dc2626",
+        wickUpColor: "#16a34a", wickDownColor: "#dc2626",
+      });
+      series.setData(this.candleData.map((c, i) => ({
+        time: i.toString(),
+        open: c.open, high: c.high, low: c.low, close: c.close,
+      })));
+      chart.timeScale().fitContent();
+    } catch (e) { console.error("Chart render error:", e); }
   }
 }'>
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -132,7 +136,11 @@
       </div>
 
       <div x-show="activeTab === 'graph'" x-cloak>
-        <div id="lwc-container" class="w-full"></div>
+        <div x-show="!candleData.length" class="flex flex-col items-center py-10 text-gray-400">
+          <i class="fa-solid fa-chart-line text-4xl mb-3"></i>
+          <p class="text-sm font-medium" x-text="chartRendered ? 'No candle data available' : 'Loading chart data...'"></p>
+        </div>
+        <div id="lwc-container" class="w-full" x-show="candleData.length"></div>
       </div>
     </div>
   </div>
