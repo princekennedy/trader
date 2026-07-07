@@ -1,60 +1,138 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+{% endblock %}
 {% block title %}Job #{{ job.id }}{% endblock %}
 {% block heading %}Job #{{ job.id }}{% endblock %}
 {% block subtitle %}{{ job.filename }}{% endblock %}
 {% block content %}
+{% set preview_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
+<div x-data="{
+  activeTab: 'image',
+  candleData: {{ candles|tojson }},
+  previewUrl: '{{ preview_url }}',
+  chartRendered: false,
+
+  switchTab(tab) {
+    this.activeTab = tab;
+    if (tab === 'graph') this.$nextTick(() => this.renderChart());
+  },
+
+  renderChart() {
+    if (this.chartRendered || !this.candleData.length) return;
+    this.chartRendered = true;
+    const container = document.getElementById('lwc-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const chart = LightweightCharts.createChart(container, {
+      height: 500,
+      layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
+      grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+      rightPriceScale: { borderColor: '#e5e5e5' },
+      timeScale: { borderColor: '#e5e5e5', visible: false },
+      crosshair: { mode: 0 },
+    });
+    const series = chart.addCandlestickSeries({
+      upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
+      wickUpColor: '#16a34a', wickDownColor: '#dc2626',
+    });
+    series.setData(this.candleData.map((c, i) => ({
+      time: i.toString(),
+      open: c.open, high: c.high, low: c.low, close: c.close,
+    })));
+    chart.timeScale().fitContent();
+  }
+}">
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
-    <h3 class="text-base font-semibold text-gray-900 mb-4">Extracted Candles</h3>
-    {% if candles|length > 0 %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-left text-gray-500 border-b border-gray-100">
-            <th class="pb-3 font-medium">#</th>
-            <th class="pb-3 font-medium">Direction</th>
-            <th class="pb-3 font-medium">Open</th>
-            <th class="pb-3 font-medium">High</th>
-            <th class="pb-3 font-medium">Low</th>
-            <th class="pb-3 font-medium">Close</th>
-            <th class="pb-3 font-medium">Volume</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for c in candles %}
-          <tr class="border-b border-gray-50 text-gray-700">
-            <td class="py-2">{{ c.index }}</td>
-            <td class="py-2">
-              <span class="inline-flex items-center gap-1 text-xs font-medium {{ 'text-green-600' if c.direction == 'bullish' else 'text-red-600' }}">
-                <i class="fa-solid {{ 'fa-arrow-up' if c.direction == 'bullish' else 'fa-arrow-down' }}"></i>
-                {{ c.direction }}
-              </span>
-            </td>
-            <td class="py-2">{{ c.open }}</td>
-            <td class="py-2">{{ c.high }}</td>
-            <td class="py-2">{{ c.low }}</td>
-            <td class="py-2">{{ c.close }}</td>
-            <td class="py-2">{{ c.volume or '--' }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 flex flex-col">
+    <div class="flex-shrink-0 border-b border-gray-100">
+      <nav class="flex px-4 gap-1">
+        <button @click="switchTab('image')" :class="activeTab === 'image' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
+          <i class="fa-solid fa-image mr-1.5"></i>Original Image
+        </button>
+        <button @click="switchTab('dataset')" :class="activeTab === 'dataset' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
+          <i class="fa-solid fa-table mr-1.5"></i>Dataset
+        </button>
+        <button @click="switchTab('graph')" :class="activeTab === 'graph' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
+          <i class="fa-solid fa-chart-line mr-1.5"></i>Graph
+        </button>
+      </nav>
     </div>
-    {% else %}
-    <div class="flex flex-col items-center py-10 text-gray-400">
-      <i class="fa-solid fa-chart-simple text-4xl mb-3"></i>
-      <p class="text-sm font-medium">No candles extracted yet</p>
-      <p class="text-xs mt-1">Processing may still be in progress</p>
+
+    <div class="flex-1 p-5 overflow-auto">
+      <div x-show="activeTab === 'image'">
+        {% if job.object_name %}
+        <img src="{{ preview_url }}" alt="Chart preview" class="w-full h-auto rounded-lg border border-gray-100">
+        {% else %}
+        <div class="flex flex-col items-center py-10 text-gray-400">
+          <i class="fa-solid fa-image text-4xl mb-3"></i>
+          <p class="text-sm font-medium">No image available</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <div x-show="activeTab === 'dataset'" x-cloak>
+        {% if candles|length > 0 %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b border-gray-100">
+                <th class="pb-2 font-medium">#</th>
+                <th class="pb-2 font-medium">Direction</th>
+                <th class="pb-2 font-medium">Open</th>
+                <th class="pb-2 font-medium">High</th>
+                <th class="pb-2 font-medium">Low</th>
+                <th class="pb-2 font-medium">Close</th>
+                <th class="pb-2 font-medium">Body</th>
+                <th class="pb-2 font-medium">Upper</th>
+                <th class="pb-2 font-medium">Lower</th>
+                <th class="pb-2 font-medium">Conf.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in candles %}
+              <tr class="border-b border-gray-50 text-gray-700 text-xs">
+                <td class="py-1.5">{{ c.index }}</td>
+                <td class="py-1.5">
+                  <span class="inline-flex items-center gap-1 text-xs font-medium {{ 'text-green-600' if c.direction == 'bullish' else 'text-red-600' }}">
+                    <i class="fa-solid {{ 'fa-arrow-up' if c.direction == 'bullish' else 'fa-arrow-down' }}"></i>
+                    {{ c.direction }}
+                  </span>
+                </td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.open) }}</td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.high) }}</td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.low) }}</td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.close) }}</td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.body) }}</td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.upper_wick) }}</td>
+                <td class="py-1.5 font-mono">{{ '%.4f'|format(c.lower_wick) }}</td>
+                <td class="py-1.5">{{ '%.2f'|format(c.confidence) if c.confidence else '--' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center py-10 text-gray-400">
+          <i class="fa-solid fa-database text-4xl mb-3"></i>
+          <p class="text-sm font-medium">No candles extracted yet</p>
+          <p class="text-xs mt-1">Processing may still be in progress</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <div x-show="activeTab === 'graph'" x-cloak>
+        <div id="lwc-container" class="w-full"></div>
+      </div>
     </div>
-    {% endif %}
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 p-5">
+  <div class="bg-white rounded-xl border border-gray-200 p-5 h-fit">
     <h3 class="text-base font-semibold text-gray-900 mb-4">Job Details</h3>
     <dl class="space-y-3 text-sm">
       <div class="flex justify-between">
         <dt class="text-gray-500">File</dt>
-        <dd class="text-gray-900 font-medium">{{ job.filename }}</dd>
+        <dd class="text-gray-900 font-medium truncate ml-2">{{ job.filename }}</dd>
       </div>
       <div class="flex justify-between">
         <dt class="text-gray-500">Symbol</dt>
@@ -88,5 +166,6 @@
       </a>
     </div>
   </div>
+</div>
 </div>
 {% endblock %}
