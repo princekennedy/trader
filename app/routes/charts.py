@@ -14,12 +14,7 @@ from app.utils.storage import get_storage, storage_available
 
 try:
     from app.utils.extractor import ChartExtractor
-    try:
-        _test = ChartExtractor()
-        EXTRACTOR_AVAILABLE = True
-    except Exception:
-        ChartExtractor = None
-        EXTRACTOR_AVAILABLE = False
+    EXTRACTOR_AVAILABLE = True
 except ImportError:
     ChartExtractor = None
     EXTRACTOR_AVAILABLE = False

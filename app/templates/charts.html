@@ -3,7 +3,7 @@
 {% block heading %}Chart Extraction{% endblock %}
 {% block subtitle %}Upload and process candlestick chart images{% endblock %}
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div x-data="{ previewUrl: '', showPreview: false }" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <div class="lg:col-span-1">
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <h3 class="text-base font-semibold text-gray-900 mb-4">Upload Chart</h3>
@@ -76,6 +76,14 @@
               <td class="py-3 text-gray-600">{{ '%.0f%%'|format(job.quality_score * 100) if job.quality_score else '--' }}</td>
               <td class="py-3 text-gray-400 text-xs">{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '--' }}</td>
               <td class="py-3">
+                {% if job.object_name %}
+                <button @click="previewUrl='{{ url_for('charts.uploaded_file', object_name=job.object_name) }}'; showPreview=true" class="text-gray-400 hover:text-blue-500 transition-colors mr-2" title="Preview">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+                {% endif %}
+                <a href="{{ url_for('charts.job_detail', job_id=job.id) }}" class="text-gray-400 hover:text-primary-500 transition-colors mr-2" title="Details">
+                  <i class="fa-solid fa-chart-simple"></i>
+                </a>
                 <form method="POST" action="{{ url_for('charts.delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?')" class="inline">
                   <button class="text-gray-400 hover:text-red-500 transition-colors">
                     <i class="fa-solid fa-trash-can"></i>
@@ -94,6 +102,21 @@
         <p class="text-xs mt-1">Upload a chart image to get started</p>
       </div>
       {% endif %}
+    </div>
+  </div>
+
+  <div x-show="showPreview" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+    <div class="fixed inset-0 bg-black/60" @click="showPreview=false"></div>
+    <div class="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+      <div class="flex items-center justify-between p-4 border-b border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-900">Chart Preview</h3>
+        <button @click="showPreview=false" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+      <div class="p-4">
+        <img :src="previewUrl" alt="Chart preview" class="w-full h-auto rounded-lg">
+      </div>
     </div>
   </div>
 </div>
