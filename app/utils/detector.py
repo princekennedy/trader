@@ -1,5 +1,10 @@
 import os
-import cv2
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
 import numpy as np
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "yolo26n.pt")
@@ -47,6 +52,8 @@ def detect_objects(image: np.ndarray, conf: float = 0.25) -> list:
 
 
 def detect_on_bytes(image_data: bytes, conf: float = 0.25) -> list:
+    if cv2 is None:
+        return []
     arr = np.frombuffer(image_data, np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:

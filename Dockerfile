@@ -25,6 +25,7 @@ RUN apt-get update && \
         libgomp1 \
         libjpeg62-turbo \
         libwebp7 \
+        libgl1 \
         libxcb1 \
         libxcb-shm0 \
         libxcb-xfixes0 \
