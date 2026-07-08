@@ -56,11 +56,11 @@ class ChartExtractor:
         result = ExtractionResult()
         h, w = img.shape[:2]
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         green_mask = cv2.inRange(hsv, self.GREEN_LOWER, self.GREEN_UPPER)
         red_mask = cv2.inRange(hsv, self.RED_LOWER1, self.RED_UPPER1)
         red_mask |= cv2.inRange(hsv, self.RED_LOWER2, self.RED_UPPER2)
+
         combined = (green_mask > 0) | (red_mask > 0)
 
         candles = self._find_candles(combined, green_mask, red_mask, h, w)
@@ -97,7 +97,7 @@ class ChartExtractor:
         density_smooth[-edge_zone:] *= 0.05
 
         min_height = np.max(density_smooth) * 0.08
-        min_distance = max(5, w // 200)
+        min_distance = max(8, w // 110)
 
         peaks, properties = find_peaks(
             density_smooth,
@@ -111,9 +111,17 @@ class ChartExtractor:
 
         typical_spacing = int(np.median(np.diff(peaks))) if len(peaks) > 1 else 11
 
+        min_peak_gap = max(typical_spacing, 20)
+        filtered_peaks = []
+        for px in peaks:
+            if filtered_peaks and (px - filtered_peaks[-1]) < min_peak_gap:
+                continue
+            filtered_peaks.append(px)
+        peaks = filtered_peaks
+
         candles = []
         for px in peaks:
-            half_w = max(typical_spacing // 2, 4)
+            half_w = max(max(typical_spacing // 2, 4), 8)
             x_start = max(0, px - half_w)
             x_end = min(w - 1, px + half_w)
 
@@ -125,15 +133,15 @@ class ChartExtractor:
             if body_info is None:
                 continue
 
-            y_min = body_info["wick_top"]
-            y_max = body_info["wick_bottom"]
+            cluster_top = body_info["wick_top"]
+            cluster_bot = body_info["wick_bottom"]
             body_top = body_info["body_top"]
             body_bot = body_info["body_bottom"]
             max_width = body_info["max_width"]
             wick_max_width = body_info["wick_max_width"]
 
             body_length = body_bot - body_top
-            total_length = y_max - y_min
+            total_length = cluster_bot - cluster_top
 
             width_sep = max_width / max(wick_max_width, 1)
             width_clarity = min(1.0, width_sep / 3.0)
@@ -149,18 +157,33 @@ class ChartExtractor:
 
             candles.append({
                 "direction": direction,
-                "x": int(px),
+                "x": px,
                 "body_top": body_top,
                 "body_bottom": body_bot,
                 "body_height": body_length,
-                "wick_top": y_min,
-                "wick_bottom": y_max,
+                "wick_top": cluster_top,
+                "wick_bottom": cluster_bot,
                 "width": int(x_end - x_start + 1),
                 "area": int(body_info["area"]),
                 "confidence": confidence,
             })
 
         candles.sort(key=lambda c: c["x"])
+
+        merged_prefix = [candles[0]]
+        for c in candles[1:]:
+            prev = merged_prefix[-1]
+            gap = c["x"] - prev["x"]
+            overlap = prev["width"] + c["width"] - gap
+            if overlap > 0 and gap < typical_spacing // 2:
+                if c["area"] > prev["area"]:
+                    merged_prefix[-1] = c
+            elif gap < typical_spacing * 0.4:
+                if c["area"] > prev["area"]:
+                    merged_prefix[-1] = c
+            else:
+                merged_prefix.append(c)
+        candles = merged_prefix
 
         candles = [
             c for c in candles
@@ -176,6 +199,14 @@ class ChartExtractor:
         for y in range(top_margin, h):
             row_widths[y] = int(np.sum(combined[y, x_start:x_end + 1]))
 
+        all_positive = np.where(row_widths > 0)[0]
+        if len(all_positive) < 3:
+            return None
+
+        max_w = float(np.max(row_widths))
+        if max_w < 2:
+            return None
+
         sig_rows = row_widths >= 3
         changes = np.diff(np.concatenate(([0], sig_rows.astype(int), [0])))
         starts = np.where(changes == 1)[0]
@@ -187,31 +218,23 @@ class ChartExtractor:
         blocks = [(int(s), int(e) - 1) for s, e in zip(starts, ends)]
         blocks.sort(key=lambda b: b[1] - b[0], reverse=True)
 
-        best_idx = 0
-        for i in range(1, min(3, len(blocks))):
-            if abs(blocks[i][0] - blocks[0][0]) > (h - top_margin) * 0.3:
-                continue
-            best_idx = i
-            break
-
-        cluster_top, cluster_bot = blocks[best_idx]
-
+        cluster_top, cluster_bot = blocks[0]
         if cluster_bot - cluster_top < 3:
             return None
 
         profile = row_widths[cluster_top:cluster_bot + 1].astype(np.float64)
-        max_w = np.max(profile)
-        if max_w < 2:
+        local_max = np.max(profile)
+        if local_max < 2:
             return None
 
-        thin_rows = profile[profile < max_w * 0.4]
-        wick_max_w = float(np.median(thin_rows)) if len(thin_rows) > 0 else max_w * 0.3
+        thin_rows = profile[profile < local_max * 0.4]
+        wick_max_w = float(np.median(thin_rows)) if len(thin_rows) > 0 else local_max * 0.3
 
-        threshold = max_w * 0.45
+        threshold = max(local_max * 0.45, 2.0)
         body_mask = profile >= threshold
-        body_changes = np.diff(np.concatenate(([0], body_mask.astype(int), [0])))
-        b_starts = np.where(body_changes == 1)[0]
-        b_ends = np.where(body_changes == -1)[0]
+        b_changes = np.diff(np.concatenate(([0], body_mask.astype(int), [0])))
+        b_starts = np.where(b_changes == 1)[0]
+        b_ends = np.where(b_changes == -1)[0]
 
         if len(b_starts) == 0:
             mid = len(profile) // 2
@@ -252,7 +275,7 @@ class ChartExtractor:
             "body_top": body_top,
             "body_bottom": body_bot,
             "body_height": body_bot - body_top,
-            "max_width": int(max_w),
+            "max_width": int(local_max),
             "wick_max_width": wick_max_w,
             "area": total_area,
         }
