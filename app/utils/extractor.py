@@ -97,93 +97,76 @@ class ChartExtractor:
         density_smooth[-edge_zone:] *= 0.05
 
         min_height = np.max(density_smooth) * 0.08
-        min_distance = max(8, w // 110)
+        min_distance = max(5, w // 200)
 
-        peaks, properties = find_peaks(
+        peaks, _ = find_peaks(
             density_smooth,
             height=min_height,
             distance=min_distance,
             prominence=min_height * 0.5,
         )
+        if len(peaks) < 2:
+            peaks = [np.argmax(density_smooth)] if len(peaks) == 0 else peaks
+            typical_spacing = w // 40
+        else:
+            typical_spacing = int(np.median(np.diff(peaks)))
 
-        if len(peaks) == 0:
-            peaks = [np.argmax(density_smooth)]
-
-        typical_spacing = int(np.median(np.diff(peaks))) if len(peaks) > 1 else 11
-
-        min_peak_gap = max(typical_spacing, 20)
-        filtered_peaks = []
-        for px in peaks:
-            if filtered_peaks and (px - filtered_peaks[-1]) < min_peak_gap:
-                continue
-            filtered_peaks.append(px)
-        peaks = filtered_peaks
+        min_body_h = max(5, h // 100)
 
         candles = []
         for px in peaks:
-            half_w = max(max(typical_spacing // 2, 4), 8)
+            half_w = max(typical_spacing // 2, 6)
             x_start = max(0, px - half_w)
             x_end = min(w - 1, px + half_w)
 
             green_px = np.sum(green_mask[:, x_start:x_end + 1])
             red_px = np.sum(red_mask[:, x_start:x_end + 1])
-            direction = "bullish" if green_px >= red_px else "bearish"
 
             body_info = self._find_body_region(combined, x_start, x_end, top_margin, h)
             if body_info is None:
                 continue
 
-            cluster_top = body_info["wick_top"]
-            cluster_bot = body_info["wick_bottom"]
-            body_top = body_info["body_top"]
-            body_bot = body_info["body_bottom"]
-            max_width = body_info["max_width"]
-            wick_max_width = body_info["wick_max_width"]
+            body_length = body_info["body_bottom"] - body_info["body_top"]
+            if body_length < min_body_h:
+                continue
 
-            body_length = body_bot - body_top
-            total_length = cluster_bot - cluster_top
-
-            width_sep = max_width / max(wick_max_width, 1)
+            total_length = body_info["wick_bottom"] - body_info["wick_top"]
+            width_sep = body_info["max_width"] / max(body_info["wick_max_width"], 1)
             width_clarity = min(1.0, width_sep / 3.0)
-
-            if total_length > 0:
-                body_ratio = body_length / total_length
-                body_fraction_score = 1.0 - abs(body_ratio - 0.5) * 1.5
-            else:
-                body_fraction_score = 0.5
-            body_fraction_score = max(0.0, min(1.0, body_fraction_score))
-
-            confidence = round(width_clarity * 0.6 + body_fraction_score * 0.4, 3)
+            body_ratio = body_length / max(total_length, 1)
+            bf = max(0.0, min(1.0, 1.0 - abs(body_ratio - 0.5) * 1.5))
+            confidence = round(width_clarity * 0.6 + bf * 0.4, 3)
 
             candles.append({
-                "direction": direction,
+                "direction": "bullish" if green_px >= red_px else "bearish",
                 "x": px,
-                "body_top": body_top,
-                "body_bottom": body_bot,
+                "body_top": body_info["body_top"],
+                "body_bottom": body_info["body_bottom"],
                 "body_height": body_length,
-                "wick_top": cluster_top,
-                "wick_bottom": cluster_bot,
+                "wick_top": body_info["wick_top"],
+                "wick_bottom": body_info["wick_bottom"],
                 "width": int(x_end - x_start + 1),
                 "area": int(body_info["area"]),
                 "confidence": confidence,
             })
 
-        candles.sort(key=lambda c: c["x"])
+        if not candles:
+            return candles
 
-        merged_prefix = [candles[0]]
+        candles.sort(key=lambda c: c["x"])
+        if len(candles) > 1:
+            survivor_spacing = int(np.median(np.diff([c["x"] for c in candles])))
+        else:
+            survivor_spacing = 15
+        merge_gap = max(survivor_spacing, 10)
+
+        kept = [candles[0]]
         for c in candles[1:]:
-            prev = merged_prefix[-1]
-            gap = c["x"] - prev["x"]
-            overlap = prev["width"] + c["width"] - gap
-            if overlap > 0 and gap < typical_spacing // 2:
-                if c["area"] > prev["area"]:
-                    merged_prefix[-1] = c
-            elif gap < typical_spacing * 0.4:
-                if c["area"] > prev["area"]:
-                    merged_prefix[-1] = c
-            else:
-                merged_prefix.append(c)
-        candles = merged_prefix
+            if c["x"] - kept[-1]["x"] >= merge_gap:
+                kept.append(c)
+            elif c["area"] > kept[-1]["area"]:
+                kept[-1] = c
+        candles = kept
 
         candles = [
             c for c in candles
