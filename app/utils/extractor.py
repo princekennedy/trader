@@ -153,23 +153,25 @@ class ChartExtractor:
         if not candles:
             return candles
 
-        candles.sort(key=lambda c: c["x"])
-        if len(candles) > 1:
-            diffs = np.diff([c["x"] for c in candles])
-            survivor_spacing = int(np.median(diffs))
-            large_gaps = diffs[diffs > survivor_spacing]
-            target_gap = int(np.median(large_gaps)) if len(large_gaps) > 0 else survivor_spacing
-        else:
-            target_gap = w // 40
-        merge_gap = max(target_gap, 10)
-
-        kept = [candles[0]]
-        for c in candles[1:]:
-            if c["x"] - kept[-1]["x"] >= merge_gap:
-                kept.append(c)
-            elif c["area"] > kept[-1]["area"]:
-                kept[-1] = c
-        candles = kept
+        density_cap = max(w // 28, 12)
+        if len(candles) > density_cap:
+            if len(candles) > 1:
+                diffs = np.diff([c["x"] for c in candles])
+                sp = int(np.median(diffs))
+                lg = diffs[diffs > sp]
+                tg = int(np.median(lg)) if len(lg) > 0 else max(sp * 2, 12)
+            else:
+                tg = max(w // 40, 12)
+            merge_gap = max(int(tg * 0.75), 12)
+            candles.sort(key=lambda c: c["x"])
+            kept = [candles[0]]
+            for c in candles[1:]:
+                gap = c["x"] - kept[-1]["x"]
+                if gap >= merge_gap:
+                    kept.append(c)
+                elif c["area"] > kept[-1]["area"]:
+                    kept[-1] = c
+            candles = kept
 
         candles = [
             c for c in candles
