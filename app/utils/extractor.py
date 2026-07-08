@@ -97,7 +97,7 @@ class ChartExtractor:
         density_smooth[-edge_zone:] *= 0.05
 
         min_height = np.max(density_smooth) * 0.08
-        min_distance = max(5, w // 200)
+        min_distance = max(5, w // 130)
 
         peaks, _ = find_peaks(
             density_smooth,
@@ -111,7 +111,7 @@ class ChartExtractor:
         else:
             typical_spacing = int(np.median(np.diff(peaks)))
 
-        min_body_h = max(5, h // 100)
+        min_body_h = max(3, h // 150)
 
         candles = []
         for px in peaks:
@@ -155,10 +155,13 @@ class ChartExtractor:
 
         candles.sort(key=lambda c: c["x"])
         if len(candles) > 1:
-            survivor_spacing = int(np.median(np.diff([c["x"] for c in candles])))
+            diffs = np.diff([c["x"] for c in candles])
+            survivor_spacing = int(np.median(diffs))
+            large_gaps = diffs[diffs > survivor_spacing]
+            target_gap = int(np.median(large_gaps)) if len(large_gaps) > 0 else survivor_spacing
         else:
-            survivor_spacing = 15
-        merge_gap = max(survivor_spacing, 10)
+            target_gap = w // 40
+        merge_gap = max(target_gap, 10)
 
         kept = [candles[0]]
         for c in candles[1:]:
