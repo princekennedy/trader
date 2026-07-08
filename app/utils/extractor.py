@@ -73,6 +73,12 @@ class ChartExtractor:
         result.quality_score = self._compute_quality(candles)
         return result
 
+    def _is_axis_column(self, combined, top_margin, h):
+        col_vertical = np.sum(combined[top_margin:, :] > 0, axis=0)
+        total_rows = h - top_margin
+        vert_ratio = col_vertical / max(total_rows, 1)
+        return vert_ratio
+
     def _find_candles(self, combined, green_mask, red_mask, h, w):
         top_margin = int(h * 0.06)
 
@@ -80,7 +86,15 @@ class ChartExtractor:
         for x in range(0, w):
             col_density[x] = np.sum(combined[top_margin:, x])
 
+        vert_ratio = self._is_axis_column(combined, top_margin, h)
+
         density_smooth = np.convolve(col_density, np.ones(5) / 5, mode="same")
+
+        density_smooth[vert_ratio > 0.25] *= 0.1
+
+        edge_zone = int(w * 0.04)
+        density_smooth[:edge_zone] *= 0.05
+        density_smooth[-edge_zone:] *= 0.05
 
         min_height = np.max(density_smooth) * 0.08
         min_distance = max(5, w // 200)
@@ -107,44 +121,31 @@ class ChartExtractor:
             red_px = np.sum(red_mask[:, x_start:x_end + 1])
             direction = "bullish" if green_px >= red_px else "bearish"
 
-            y_min = h
-            y_max = 0
-            for y in range(top_margin, h):
-                if np.any(combined[y, x_start:x_end + 1]):
-                    if y < y_min:
-                        y_min = y
-                    y_max = y
-
-            if y_max <= y_min or y_max - y_min < 3:
+            body_info = self._find_body_region(combined, x_start, x_end, top_margin, h)
+            if body_info is None:
                 continue
 
-            col_counts = {}
-            for y in range(y_min, y_max + 1):
-                cc = int(np.sum(combined[y, x_start:x_end + 1]))
-                if cc > 0:
-                    col_counts[y] = cc
+            y_min = body_info["wick_top"]
+            y_max = body_info["wick_bottom"]
+            body_top = body_info["body_top"]
+            body_bot = body_info["body_bottom"]
+            max_width = body_info["max_width"]
+            wick_max_width = body_info["wick_max_width"]
 
-            body_top = y_max
-            body_bot = y_min
-            for y, cc in col_counts.items():
-                if cc >= 4:
-                    if y < body_top:
-                        body_top = y
-                    if y > body_bot:
-                        body_bot = y
-
-            if body_top > body_bot:
-                body_top = y_min
-                body_bot = y_max
-
-            total_area = sum(col_counts.values())
-            avg_body_width = np.mean([
-                cc for cc in col_counts.values() if cc >= 4
-            ]) if any(cc >= 4 for cc in col_counts.values()) else 1
-
-            total_length = y_max - y_min
             body_length = body_bot - body_top
-            confidence = min(1.0, body_length / 200.0) * min(1.0, avg_body_width / 7.0)
+            total_length = y_max - y_min
+
+            width_sep = max_width / max(wick_max_width, 1)
+            width_clarity = min(1.0, width_sep / 3.0)
+
+            if total_length > 0:
+                body_ratio = body_length / total_length
+                body_fraction_score = 1.0 - abs(body_ratio - 0.5) * 1.5
+            else:
+                body_fraction_score = 0.5
+            body_fraction_score = max(0.0, min(1.0, body_fraction_score))
+
+            confidence = round(width_clarity * 0.6 + body_fraction_score * 0.4, 3)
 
             candles.append({
                 "direction": direction,
@@ -155,23 +156,106 @@ class ChartExtractor:
                 "wick_top": y_min,
                 "wick_bottom": y_max,
                 "width": int(x_end - x_start + 1),
-                "area": int(total_area),
-                "confidence": round(confidence, 3),
+                "area": int(body_info["area"]),
+                "confidence": confidence,
             })
 
         candles.sort(key=lambda c: c["x"])
 
-        edge_margin = int(w * 0.02)
-        valid_x_range = (edge_margin, w - edge_margin)
-
         candles = [
             c for c in candles
-            if valid_x_range[0] < c["x"] < valid_x_range[1]
-            and c["wick_bottom"] - c["wick_top"] > 5
+            if c["wick_bottom"] - c["wick_top"] > 5
             and c["confidence"] > 0.05
+            and c["wick_bottom"] - c["wick_top"] < h * 0.5
         ]
 
         return candles
+
+    def _find_body_region(self, combined, x_start, x_end, top_margin, h):
+        row_widths = np.zeros(h, dtype=np.int32)
+        for y in range(top_margin, h):
+            row_widths[y] = int(np.sum(combined[y, x_start:x_end + 1]))
+
+        sig_rows = row_widths >= 3
+        changes = np.diff(np.concatenate(([0], sig_rows.astype(int), [0])))
+        starts = np.where(changes == 1)[0]
+        ends = np.where(changes == -1)[0]
+
+        if len(starts) == 0:
+            return None
+
+        blocks = [(int(s), int(e) - 1) for s, e in zip(starts, ends)]
+        blocks.sort(key=lambda b: b[1] - b[0], reverse=True)
+
+        best_idx = 0
+        for i in range(1, min(3, len(blocks))):
+            if abs(blocks[i][0] - blocks[0][0]) > (h - top_margin) * 0.3:
+                continue
+            best_idx = i
+            break
+
+        cluster_top, cluster_bot = blocks[best_idx]
+
+        if cluster_bot - cluster_top < 3:
+            return None
+
+        profile = row_widths[cluster_top:cluster_bot + 1].astype(np.float64)
+        max_w = np.max(profile)
+        if max_w < 2:
+            return None
+
+        thin_rows = profile[profile < max_w * 0.4]
+        wick_max_w = float(np.median(thin_rows)) if len(thin_rows) > 0 else max_w * 0.3
+
+        threshold = max_w * 0.45
+        body_mask = profile >= threshold
+        body_changes = np.diff(np.concatenate(([0], body_mask.astype(int), [0])))
+        b_starts = np.where(body_changes == 1)[0]
+        b_ends = np.where(body_changes == -1)[0]
+
+        if len(b_starts) == 0:
+            mid = len(profile) // 2
+            body_top_local = max(0, mid - 1)
+            body_bot_local = min(len(profile) - 1, mid + 1)
+        else:
+            b_regions = [(int(s), int(e) - 1) for s, e in zip(b_starts, b_ends)]
+            center = len(profile) // 2
+            b_regions.sort(key=lambda r: abs((r[0] + r[1]) // 2 - center))
+            best_r = b_regions[0]
+            largest = max(b_regions, key=lambda r: r[1] - r[0])
+            if best_r[1] - best_r[0] >= (largest[1] - largest[0]) * 0.4:
+                body_top_local, body_bot_local = best_r
+            else:
+                body_top_local, body_bot_local = largest
+
+        body_top = cluster_top + body_top_local
+        body_bot = cluster_top + body_bot_local
+
+        if body_top >= body_bot:
+            mid = (cluster_top + cluster_bot) // 2
+            body_top = max(cluster_top, mid - 1)
+            body_bot = min(cluster_bot, mid + 1)
+
+        wick_top = cluster_top
+        wick_bot = cluster_bot
+
+        while wick_top > top_margin and row_widths[wick_top - 1] >= 1:
+            wick_top -= 1
+        while wick_bot + 1 < h and row_widths[wick_bot + 1] >= 1:
+            wick_bot += 1
+
+        total_area = int(np.sum(profile))
+
+        return {
+            "wick_top": wick_top,
+            "wick_bottom": wick_bot,
+            "body_top": body_top,
+            "body_bottom": body_bot,
+            "body_height": body_bot - body_top,
+            "max_width": int(max_w),
+            "wick_max_width": wick_max_w,
+            "area": total_area,
+        }
 
     def _assign_ohlc(self, candles):
         for c in candles:
@@ -220,5 +304,20 @@ class ChartExtractor:
             return 0.0
         confs = [c["confidence"] for c in candles]
         avg_conf = float(np.mean(confs))
-        coverage = min(1.0, len(candles) / 80.0)
-        return round(avg_conf * 0.5 + coverage * 0.5, 2)
+        candle_count = len(candles)
+        min_good = 20
+        max_good = 150
+        if candle_count >= max_good:
+            coverage = 1.0
+        elif candle_count <= min_good:
+            coverage = candle_count / max_good
+        else:
+            coverage = 0.5 + 0.5 * (candle_count - min_good) / (max_good - min_good)
+        coverage = min(1.0, coverage)
+        body_ratios = [
+            abs(c["body_bottom"] - c["body_top"]) / max(c["wick_bottom"] - c["wick_top"], 1)
+            for c in candles
+        ]
+        avg_body_ratio = float(np.mean(body_ratios)) if body_ratios else 0
+        body_ratio_score = min(1.0, avg_body_ratio * 3.0)
+        return round(avg_conf * 0.5 + coverage * 0.3 + body_ratio_score * 0.2, 2)
