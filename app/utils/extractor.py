@@ -162,13 +162,15 @@ class ChartExtractor:
                 tg = int(np.median(lg)) if len(lg) > 0 else max(sp * 2, 12)
             else:
                 tg = max(w // 40, 12)
-            merge_gap = max(int(tg * 0.75), 12)
+            merge_gap = max(int(tg * 0.7 + 0.5), int(sp * 0.8), 5)
             candles.sort(key=lambda c: c["x"])
             kept = [candles[0]]
+            ref_x = candles[0]["x"]
             for c in candles[1:]:
-                gap = c["x"] - kept[-1]["x"]
+                gap = c["x"] - ref_x
                 if gap >= merge_gap:
                     kept.append(c)
+                    ref_x = c["x"]
                 elif c["area"] > kept[-1]["area"]:
                     kept[-1] = c
             candles = kept
