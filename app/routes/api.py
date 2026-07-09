@@ -163,6 +163,9 @@ def api_create_job():
         return jsonify({"error": "extraction", "message": "Extraction unavailable"}), 500
 
     try:
+        Candle.query.filter_by(job_id=job.id).delete()
+        db.session.flush()
+
         data = get_storage().download_bytes(obj_name)
         extractor = ChartExtractor()
         result = extractor.extract_from_bytes(data)
@@ -184,6 +187,7 @@ def api_create_job():
             db.session.add(candle)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()
         job.status = "failed"
         db.session.commit()
         return jsonify({"error": "extraction", "message": str(e)}), 500
@@ -268,6 +272,7 @@ def api_reprocess_job(job_id):
             db.session.add(candle)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()
         job.status = "failed"
         db.session.commit()
         return jsonify({"error": "extraction", "message": str(e)}), 500

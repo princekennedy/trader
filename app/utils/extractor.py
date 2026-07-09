@@ -204,6 +204,24 @@ class ChartExtractor:
                 kept[-1] = c
         candles = kept
 
+        candles.sort(key=lambda c: c["x"])
+        deduped = []
+        for c in candles:
+            if not deduped:
+                deduped.append(c)
+                continue
+            prev = deduped[-1]
+            gap = c["x"] - prev["x"]
+            prev_hw = max(int(prev.get("max_width", 4) / 2 + 0.5), 3)
+            curr_hw = max(int(c.get("max_width", 4) / 2 + 0.5), 3)
+            overlap = prev_hw + curr_hw - gap
+            if overlap >= max(prev_hw, curr_hw) * 0.3:
+                if c["area"] > prev["area"]:
+                    deduped[-1] = c
+            else:
+                deduped.append(c)
+        candles = deduped
+
         candles = [
             c for c in candles
             if c["wick_bottom"] - c["wick_top"] > 5

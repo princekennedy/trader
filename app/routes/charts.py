@@ -106,6 +106,9 @@ def index():
             return redirect(url_for("charts.index"))
 
         try:
+            Candle.query.filter_by(job_id=job.id).delete()
+            db.session.flush()
+
             result = _extract_from_storage(object_name)
 
             job.status = "completed" if result.candles else "failed"
@@ -141,6 +144,7 @@ def index():
                 "success",
             )
         except Exception as e:
+            db.session.rollback()
             job.status = "failed"
             job.error_message = str(e)
             _set_audit_updated(job)
@@ -283,6 +287,7 @@ def reprocess_job(job_id):
             "success",
         )
     except Exception as e:
+        db.session.rollback()
         job.status = "failed"
         job.error_message = str(e)
         _set_audit_updated(job)
