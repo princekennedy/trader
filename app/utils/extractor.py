@@ -88,20 +88,16 @@ class ChartExtractor:
 
         vert_ratio = self._is_axis_column(combined, top_margin, h)
 
+        density_smooth = np.convolve(col_density, np.ones(3) / 3, mode="same")
+
         density_smooth = np.convolve(col_density, np.ones(5) / 5, mode="same")
-
-        density_smooth[vert_ratio > 0.25] *= 0.1
-
-        edge_zone = int(w * 0.04)
-        density_smooth[:edge_zone] *= 0.05
-        density_smooth[-edge_zone:] *= 0.05
 
         max_density = np.max(density_smooth)
         if max_density < 1:
             return []
 
         min_height = max_density * 0.04
-        min_distance = max(3, w // 200)
+        min_distance = max(2, w // 300)
 
         peaks, _ = find_peaks(
             density_smooth,
@@ -175,7 +171,7 @@ class ChartExtractor:
         ref_body_w = ref["max_width"]
         ref_body_frac = ref["body_fraction"]
 
-        min_w = max(ref_body_w * 0.50, 3)
+        min_w = max(ref_body_w * 0.40, 3)
         min_frac = max(ref_body_frac * 0.30, 0.15)
         candles = [
             c for c in candles
