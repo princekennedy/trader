@@ -96,26 +96,33 @@ class ChartExtractor:
         density_smooth[:edge_zone] *= 0.05
         density_smooth[-edge_zone:] *= 0.05
 
-        min_height = np.max(density_smooth) * 0.08
-        min_distance = max(5, w // 130)
+        max_density = np.max(density_smooth)
+        if max_density < 1:
+            return []
+
+        min_height = max_density * 0.04
+        min_distance = max(3, w // 200)
 
         peaks, _ = find_peaks(
             density_smooth,
             height=min_height,
             distance=min_distance,
-            prominence=min_height * 0.5,
+            prominence=min_height * 0.3,
         )
         if len(peaks) < 2:
             peaks = [np.argmax(density_smooth)] if len(peaks) == 0 else peaks
-            typical_spacing = w // 40
-        else:
-            typical_spacing = int(np.median(np.diff(peaks)))
 
         min_body_h = max(3, h // 150)
 
         candles = []
         for px in peaks:
-            half_w = max(typical_spacing // 2, 6)
+            left = px
+            while left > 0 and density_smooth[left] >= density_smooth[left - 1]:
+                left -= 1
+            right = px
+            while right < w - 1 and density_smooth[right] >= density_smooth[right + 1]:
+                right += 1
+            half_w = min(max((right - left) // 2, 4), w // 30)
             x_start = max(0, px - half_w)
             x_end = min(w - 1, px + half_w)
 
@@ -147,33 +154,55 @@ class ChartExtractor:
                 "wick_bottom": body_info["wick_bottom"],
                 "width": int(x_end - x_start + 1),
                 "area": int(body_info["area"]),
+                "max_width": body_info["max_width"],
+                "body_fraction": body_ratio,
                 "confidence": confidence,
             })
 
         if not candles:
             return candles
 
-        density_cap = max(w // 28, 12)
-        if len(candles) > density_cap:
-            if len(candles) > 1:
-                diffs = np.diff([c["x"] for c in candles])
-                sp = int(np.median(diffs))
-                lg = diffs[diffs > sp]
-                tg = int(np.median(lg)) if len(lg) > 0 else max(sp * 2, 12)
-            else:
-                tg = max(w // 40, 12)
-            merge_gap = max(int(tg * 0.7 + 0.5), int(sp * 0.8), 5)
-            candles.sort(key=lambda c: c["x"])
-            kept = [candles[0]]
-            ref_x = candles[0]["x"]
-            for c in candles[1:]:
-                gap = c["x"] - ref_x
-                if gap >= merge_gap:
-                    kept.append(c)
-                    ref_x = c["x"]
-                elif c["area"] > kept[-1]["area"]:
-                    kept[-1] = c
-            candles = kept
+        reasonable = [
+            c for c in candles
+            if c["max_width"] < max(w // 15, 15)
+        ]
+        ref = sorted(
+            reasonable, key=lambda c: c["max_width"] * c["body_fraction"], reverse=True
+        )[0] if reasonable else sorted(
+            candles, key=lambda c: c["area"], reverse=True
+        )[0]
+
+        ref_body_w = ref["max_width"]
+        ref_body_frac = ref["body_fraction"]
+
+        min_w = max(ref_body_w * 0.50, 3)
+        min_frac = max(ref_body_frac * 0.30, 0.15)
+        candles = [
+            c for c in candles
+            if c["max_width"] >= min_w and c["body_fraction"] >= min_frac
+        ]
+
+        candles.sort(key=lambda c: c["x"])
+        distances = []
+        for i, c in enumerate(candles):
+            left_gap = c["x"] - candles[i - 1]["x"] if i > 0 else 999
+            right_gap = candles[i + 1]["x"] - c["x"] if i < len(candles) - 1 else 999
+            distances.append(min(left_gap, right_gap))
+        ref_nearest = distances[np.argmax(
+            [c["max_width"] * c["body_fraction"] for c in candles]
+        )]
+
+        merge_gap = max(int(ref_nearest * 0.35 + 0.5), 3)
+        kept = [candles[0]]
+        ref_x = candles[0]["x"]
+        for c in candles[1:]:
+            gap = c["x"] - ref_x
+            if gap >= merge_gap:
+                kept.append(c)
+                ref_x = c["x"]
+            elif c["area"] > kept[-1]["area"]:
+                kept[-1] = c
+        candles = kept
 
         candles = [
             c for c in candles
