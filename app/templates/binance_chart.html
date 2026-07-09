@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Binance Live{% endblock %}
+{% block heading %}Binance Live{% endblock %}
+{% block subtitle %}Real-time crypto candlestick data{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+{% endblock %}
+{% block content %}
+<div x-data="binanceChart()" x-init="init()" class="space-y-4">
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Symbol</label>
+        <select x-model="symbol" @change="fetchKlines()" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+          <template x-for="s in symbols" :key="s">
+            <option :value="s" x-text="s"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Interval</label>
+        <select x-model="interval" @change="fetchKlines()" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+          <template x-for="iv in intervals" :key="iv">
+            <option :value="iv" x-text="iv"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Candles</label>
+        <select x-model="limit" @change="fetchKlines()" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+      </div>
+      <div class="pt-5">
+        <button @click="fetchKlines()" class="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">
+          <i class="fa-solid fa-rotate" :class="{'fa-spin': loading}"></i>
+          <span x-text="loading ? 'Loading...' : 'Refresh'"></span>
+        </button>
+      </div>
+      <div class="pt-5 flex items-center gap-2">
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" x-model="autoRefresh" class="sr-only peer">
+          <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+        </label>
+        <span class="text-xs text-gray-500 font-medium">Auto-refresh</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <template x-if="info">
+      <div class="flex flex-wrap items-center gap-4 mb-3 text-sm">
+        <span class="font-semibold text-gray-900" x-text="info.symbol"></span>
+        <span class="text-gray-500">|</span>
+        <span class="text-gray-700">O: <span class="font-medium" x-text="info.open"></span></span>
+        <span class="text-gray-700">H: <span class="font-medium" x-text="info.high"></span></span>
+        <span class="text-gray-700">L: <span class="font-medium" x-text="info.low"></span></span>
+        <span class="text-gray-700">C: <span class="font-medium" x-text="info.close"></span></span>
+        <span :class="info.change >= 0 ? 'text-green-600' : 'text-red-600'" class="font-medium" x-text="(info.change >= 0 ? '+' : '') + info.change.toFixed(2) + '%'"></span>
+        <span class="text-gray-400 text-xs" x-text="info.time"></span>
+      </div>
+    </template>
+    <div id="lwc-container" class="w-full" style="height:520px;"></div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function binanceChart() {
+  return {
+    symbols: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'DOTUSDT', 'AVAXUSDT', 'LINKUSDT', 'MATICUSDT', 'UNIUSDT', 'ATOMUSDT', 'LTCUSDT', 'BCHUSDT', 'TRXUSDT', 'NEARUSDT', 'APTUSDT', 'ARBUSDT', 'OPUSDT'],
+    intervals: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'],
+    symbol: 'BTCUSDT',
+    interval: '1h',
+    limit: 100,
+    autoRefresh: false,
+    loading: false,
+    info: null,
+    _chart: null,
+    _series: null,
+    _timer: null,
+
+    init() {
+      this.fetchKlines();
+    },
+
+    fetchKlines() {
+      if (this._timer) { clearInterval(this._timer); this._timer = null; }
+      this.loading = true;
+      const url = `/binance/api/klines?symbol=${this.symbol}&interval=${this.interval}&limit=${this.limit}`;
+      fetch(url)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => {
+          this.renderChart(data.candles);
+          const last = data.candles[data.candles.length - 1];
+          if (last) {
+            const first = data.candles[0];
+            this.info = {
+              symbol: data.symbol + ' ' + data.interval,
+              open: last.open.toFixed(2),
+              high: last.high.toFixed(2),
+              low: last.low.toFixed(2),
+              close: last.close.toFixed(2),
+              change: first ? ((last.close - first.open) / first.open) * 100 : 0,
+              time: new Date(last.time * 1000).toLocaleString(),
+            };
+          }
+          this.loading = false;
+          if (this.autoRefresh) this._startAutoRefresh();
+        })
+        .catch(e => { console.error('Fetch error:', e); this.loading = false; });
+    },
+
+    renderChart(candles) {
+      const el = document.getElementById('lwc-container');
+      if (!el) return;
+      if (this._chart) { try { this._chart.remove(); } catch(e) {} this._chart = null; }
+      el.innerHTML = '';
+      if (!candles || !candles.length) return;
+      try {
+        this._chart = LightweightCharts.createChart(el, {
+          height: 520,
+          layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
+          grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+          rightPriceScale: { borderColor: '#e5e5e5' },
+          timeScale: { borderColor: '#e5e5e5', timeVisible: true, secondsVisible: false },
+          crosshair: { mode: 0 },
+        });
+        this._series = this._chart.addCandlestickSeries({
+          upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
+          wickUpColor: '#16a34a', wickDownColor: '#dc2626',
+        });
+        this._series.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+        this._chart.timeScale().fitContent();
+      } catch(e) { console.error('Chart render error:', e); }
+    },
+
+    _startAutoRefresh() {
+      if (this._timer) clearInterval(this._timer);
+      this._timer = setInterval(() => {
+        const url = `/binance/api/klines?symbol=${this.symbol}&interval=${this.interval}&limit=${this.limit}`;
+        fetch(url)
+          .then(r => r.json())
+          .then(data => {
+            this.renderChart(data.candles);
+            const last = data.candles[data.candles.length - 1];
+            if (last) {
+              const first = data.candles[0];
+              this.info = {
+                symbol: data.symbol + ' ' + data.interval,
+                open: last.open.toFixed(2),
+                high: last.high.toFixed(2),
+                low: last.low.toFixed(2),
+                close: last.close.toFixed(2),
+                change: first ? ((last.close - first.open) / first.open) * 100 : 0,
+                time: new Date(last.time * 1000).toLocaleString(),
+              };
+            }
+          })
+          .catch(() => {});
+      }, 30000);
+    },
+  };
+}
+</script>
+{% endblock %}

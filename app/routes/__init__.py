@@ -8,6 +8,7 @@ def register_blueprints(app):
     from app.routes.api import api_bp
     from app.routes.roles import roles_bp
     from app.routes.users_mgmt import users_bp
+    from app.routes.binance import binance_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(org_bp)
@@ -18,6 +19,7 @@ def register_blueprints(app):
     app.register_blueprint(api_bp)
     app.register_blueprint(roles_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(binance_bp)
 
     from app.commands import seed_command
     app.cli.add_command(seed_command)
