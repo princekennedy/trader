@@ -20,108 +20,120 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <span class="text-xs font-medium text-gray-500">Rules</span>
-        <div class="flex items-center gap-1">
-          <button @click="addPreset('bullish_reversal')" class="text-xs text-green-600 hover:text-green-700 font-medium" title="Add Bullish Reversal preset">
-            <i class="fa-solid fa-wand-magic-sparkles mr-0.5"></i> Preset
-          </button>
-          <button @click="showAddRule = !showAddRule" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
-            <i class="fa-solid fa-plus mr-0.5"></i> Add
-          </button>
-        </div>
-      </div>
-
-      <div x-cloak x-show="showAddRule" class="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
-        <input x-model="newRule.name" type="text" placeholder="Rule name" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
-        <div x-data="{ type: 'consecutive_bullish' }" class="space-y-2">
-          <select x-model="type" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
-            <option value="consecutive_bullish">N consecutive bullish → bearish</option>
-            <option value="consecutive_bearish">N consecutive bearish → bullish</option>
-            <option value="long_upper_wick">Long upper wick (≥ ratio) → bearish</option>
-            <option value="long_lower_wick">Long lower wick (≥ ratio) → bullish</option>
-            <option value="volume_spike">Volume spike (≥ mult) → continuation</option>
-            <option value="marubozu">Marubozu (body ≥ 85%) → continuation</option>
-            <option value="doji">Doji (body ≤ 10%) → reversal</option>
-            <option value="engulfing">Engulfing pattern → reversal</option>
-          </select>
-          <template x-if="['consecutive_bullish','consecutive_bearish'].includes(type)">
-            <input x-model="newRule.value" type="number" min="2" max="10" placeholder="Count (e.g. 3)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
-          </template>
-          <template x-if="['long_upper_wick','long_lower_wick'].includes(type)">
-            <input x-model="newRule.value" type="number" step="0.05" min="0.1" max="0.9" placeholder="Ratio (e.g. 0.5)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
-          </template>
-          <template x-if="type === 'volume_spike'">
-            <input x-model="newRule.value" type="number" step="0.5" min="1.0" placeholder="Multiplier (e.g. 2.0)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
-          </template>
-          <button @click="addRule(type)" class="w-full px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors">
-            <i class="fa-solid fa-check mr-0.5"></i> Create
-          </button>
-        </div>
-      </div>
-
-      <template x-if="loadingRules">
-        <div class="text-center py-4 text-gray-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading rules...</div>
-      </template>
-
-      <template x-if="!loadingRules && rules.length === 0">
-        <div class="text-center py-6 text-gray-400">
-          <i class="fa-solid fa-ruler text-2xl mb-2"></i>
-          <p class="text-xs font-medium">No rules yet</p>
-          <p class="text-xs mt-1">Click "Preset" to add a pre-built rule, or "Add" to create one</p>
-        </div>
-      </template>
-
-      <template x-for="rule in rules" :key="rule.id">
-        <div class="flex items-start gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
-          <input type="checkbox" :value="rule.id" x-model="selectedRules" class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
-          <div class="flex-1 min-w-0">
-            <p class="text-xs font-medium text-gray-900" x-text="rule.name"></p>
-            <p class="text-xs text-gray-500 truncate" x-text="describeRule(rule)"></p>
+    <div class="flex-1 flex flex-col min-h-0">
+      <div x-cloak x-show="projection" class="flex-shrink-0 px-4 pt-3 pb-2">
+        <div class="rounded-lg border p-3" :class="projection.direction === 'bullish' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-gray-700">Next Candle</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold" :class="projection.direction === 'bullish' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'">
+              <i :class="projection.direction === 'bullish' ? 'fa-arrow-up' : 'fa-arrow-down'" class="fa-solid"></i>
+              <span x-text="projection.direction.toUpperCase()"></span>
+            </span>
           </div>
-          <button @click="deleteRule(rule.id)" class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
-            <i class="fa-solid fa-trash-can text-xs"></i>
-          </button>
+          <div class="grid grid-cols-4 gap-1 text-center text-[11px]">
+            <div><span class="text-gray-400">O</span><br><span class="font-semibold font-mono" x-text="projection.open.toFixed(typeof projection.open === 'number' && projection.open < 1 ? 6 : 2)"></span></div>
+            <div><span class="text-gray-400">H</span><br><span class="font-semibold font-mono" x-text="projection.high.toFixed(typeof projection.high === 'number' && projection.high < 1 ? 6 : 2)"></span></div>
+            <div><span class="text-gray-400">L</span><br><span class="font-semibold font-mono" x-text="projection.low.toFixed(typeof projection.low === 'number' && projection.low < 1 ? 6 : 2)"></span></div>
+            <div><span class="text-gray-400">C</span><br><span class="font-semibold font-mono" x-text="projection.close.toFixed(typeof projection.close === 'number' && projection.close < 1 ? 6 : 2)"></span></div>
+          </div>
+          <div class="mt-1.5 text-center text-[11px] text-gray-500">
+            <span class="font-medium" x-text="(projection.confidence * 100).toFixed(0) + '% confidence'"></span>
+            <span class="text-gray-300 mx-1">·</span>
+            <span class="text-green-600 font-medium" x-text="votes.bullish"></span>B /
+            <span class="text-red-600 font-medium" x-text="votes.bearish"></span>B
+          </div>
         </div>
-      </template>
+      </div>
 
-      <div x-cloak x-show="selectedRules.length > 0" class="pt-2">
-        <button @click="project()" :disabled="projecting" :class="projecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-700'" class="w-full px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+      <div x-cloak x-show="!projection" class="flex-shrink-0 px-4 pt-3 pb-2">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-center text-xs text-gray-400">
+          <i class="fa-solid fa-chart-simple text-lg mb-1"></i>
+          <p>Select rules and click project to see the next candle prediction</p>
+        </div>
+      </div>
+
+      <div class="flex-shrink-0 px-4 pb-1">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-gray-500">Rules</span>
+          <div class="flex items-center gap-1">
+            <button @click="addPreset('bullish_reversal')" class="text-xs text-green-600 hover:text-green-700 font-medium" title="Add Bullish Reversal preset">
+              <i class="fa-solid fa-wand-magic-sparkles mr-0.5"></i> Preset
+            </button>
+            <button @click="showAddRule = !showAddRule" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+              <i class="fa-solid fa-plus mr-0.5"></i> Add
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div x-cloak x-show="showAddRule" class="flex-shrink-0 px-4 pb-1">
+        <div class="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+          <input x-model="newRule.name" type="text" placeholder="Rule name" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+          <div x-data="{ type: 'consecutive_bullish' }" class="space-y-2">
+            <select x-model="type" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+              <option value="consecutive_bullish">N consecutive bullish → bearish</option>
+              <option value="consecutive_bearish">N consecutive bearish → bullish</option>
+              <option value="long_upper_wick">Long upper wick (≥ ratio) → bearish</option>
+              <option value="long_lower_wick">Long lower wick (≥ ratio) → bullish</option>
+              <option value="volume_spike">Volume spike (≥ mult) → continuation</option>
+              <option value="marubozu">Marubozu (body ≥ 85%) → continuation</option>
+              <option value="doji">Doji (body ≤ 10%) → reversal</option>
+              <option value="engulfing">Engulfing pattern → reversal</option>
+            </select>
+            <template x-if="['consecutive_bullish','consecutive_bearish'].includes(type)">
+              <input x-model="newRule.value" type="number" min="2" max="10" placeholder="Count (e.g. 3)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+            </template>
+            <template x-if="['long_upper_wick','long_lower_wick'].includes(type)">
+              <input x-model="newRule.value" type="number" step="0.05" min="0.1" max="0.9" placeholder="Ratio (e.g. 0.5)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+            </template>
+            <template x-if="type === 'volume_spike'">
+              <input x-model="newRule.value" type="number" step="0.5" min="1.0" placeholder="Multiplier (e.g. 2.0)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+            </template>
+            <button @click="addRule(type)" class="w-full px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors">
+              <i class="fa-solid fa-check mr-0.5"></i> Create
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-4 min-h-0" style="max-height: 45vh;">
+        <template x-if="loadingRules">
+          <div class="text-center py-4 text-gray-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading rules...</div>
+        </template>
+
+        <div class="space-y-1.5 pb-3">
+          <template x-if="!loadingRules && rules.length === 0">
+            <div class="text-center py-6 text-gray-400">
+              <i class="fa-solid fa-ruler text-2xl mb-2"></i>
+              <p class="text-xs font-medium">No rules yet</p>
+              <p class="text-xs mt-1">Click "Preset" to add a pre-built rule, or "Add" to create one</p>
+            </div>
+          </template>
+
+          <template x-for="rule in rules" :key="rule.id">
+            <div class="flex items-start gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+              <input type="checkbox" :value="rule.id" x-model="selectedRules" class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-medium text-gray-900" x-text="rule.name"></p>
+                <p class="text-xs text-gray-500 truncate" x-text="describeRule(rule)"></p>
+              </div>
+              <button @click="deleteRule(rule.id)" class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="flex-shrink-0 border-t border-gray-100 px-4 py-3 space-y-2 bg-white">
+        <button @click="project()" :disabled="projecting || selectedRules.length === 0" :class="projecting || selectedRules.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-700'" class="w-full px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
           <i class="fa-solid" :class="projecting ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
           <span x-text="projecting ? 'Projecting...' : 'Project Next Candle'"></span>
         </button>
-      </div>
 
-      <div x-cloak x-show="projection" class="bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold text-gray-900">Projected Candle</span>
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="projection.direction === 'bullish' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
-            <i :class="projection.direction === 'bullish' ? 'fa-arrow-up' : 'fa-arrow-down'" class="fa-solid"></i>
-            <span x-text="projection.direction"></span>
-          </span>
-        </div>
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <div><span class="text-gray-500">Open:</span> <span class="font-mono font-medium" x-text="projection.open.toFixed(typeof projection.open === 'number' && projection.open < 1 ? 6 : 2)"></span></div>
-          <div><span class="text-gray-500">Close:</span> <span class="font-mono font-medium" x-text="projection.close.toFixed(typeof projection.close === 'number' && projection.close < 1 ? 6 : 2)"></span></div>
-          <div><span class="text-gray-500">High:</span> <span class="font-mono font-medium" x-text="projection.high.toFixed(typeof projection.high === 'number' && projection.high < 1 ? 6 : 2)"></span></div>
-          <div><span class="text-gray-500">Low:</span> <span class="font-mono font-medium" x-text="projection.low.toFixed(typeof projection.low === 'number' && projection.low < 1 ? 6 : 2)"></span></div>
-        </div>
-        <div class="text-xs space-y-0.5">
-          <div class="text-gray-500">
-            Confidence: <span class="font-semibold" x-text="(projection.confidence * 100).toFixed(0) + '%'"></span>
-            <span class="text-gray-300 mx-1">|</span>
-            Votes: <span class="text-green-600 font-medium" x-text="votes.bullish"></span>B /
-            <span class="text-red-600 font-medium" x-text="votes.bearish"></span>B
-          </div>
-          <template x-if="triggers && triggers.length">
-            <div class="text-gray-400 text-[11px] pt-1 border-t border-gray-200 mt-1">
-              <span class="font-medium text-gray-500">Triggered:</span>
-              <template x-for="t in triggers" :key="t.rule_id">
-                <span class="ml-1" x-text="t.rule_name"></span>
-              </template>
-            </div>
-          </template>
+        <div x-cloak x-show="projection && triggers && triggers.length" class="text-xs text-gray-400 text-center">
+          <span class="font-medium text-gray-500">Triggered:</span>
+          <span x-text="triggers.map(t => t.rule_name).join(', ')"></span>
         </div>
       </div>
     </div>
