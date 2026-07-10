@@ -10,9 +10,14 @@
       <h3 class="text-sm font-semibold text-gray-900">
         <i class="fa-solid fa-wand-magic-sparkles text-primary-500 mr-1.5"></i> Candle Projector
       </h3>
-      <button @click="open = false" class="text-gray-400 hover:text-gray-600 transition-colors">
-        <i class="fa-solid fa-xmark text-lg"></i>
-      </button>
+      <div class="flex items-center gap-2">
+        <button @click="showDocs = true" class="text-gray-400 hover:text-primary-500 transition-colors" title="Rule documentation">
+          <i class="fa-regular fa-circle-question text-lg"></i>
+        </button>
+        <button @click="open = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
@@ -121,12 +126,182 @@
       </div>
     </div>
   </div>
+
+  <div x-cloak x-show="showDocs" x-transition:enter="transition-opacity ease-linear duration-200" x-transition:leave="transition-opacity ease-linear duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[60] bg-gray-600 bg-opacity-60 flex items-center justify-center p-4" @click="showDocs = false">
+    <div x-cloak x-show="showDocs" x-transition:enter="transition-all ease-out duration-200" x-transition:leave="transition-all ease-in duration-150" x-transition:enter-start="scale-95 opacity-0" x-transition:enter-end="scale-100 opacity-100" x-transition:leave-start="scale-100 opacity-100" x-transition:leave-end="scale-95 opacity-0" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" @click.stop>
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+        <h3 class="text-base font-semibold text-gray-900">
+          <i class="fa-regular fa-circle-question text-primary-500 mr-2"></i> Rule Documentation
+        </h3>
+        <button @click="showDocs = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-6 py-4 space-y-6 text-sm">
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Overview</h4>
+          <p class="text-gray-600 leading-relaxed">
+            Rules define patterns to detect in candle data and predict the next candle's direction.
+            All selected rules are evaluated against your candle data; each triggered rule casts a vote
+            for bullish or bearish. The consensus determines the projected candle.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">How Projection Works</h4>
+          <ol class="list-decimal list-inside text-gray-600 space-y-1 leading-relaxed">
+            <li>Select one or more rules via the checkboxes</li>
+            <li>Click <strong>Project Next Candle</strong></li>
+            <li>Each rule checks its conditions against your candle data</li>
+            <li>Rules that trigger vote bullish or bearish</li>
+            <li>The majority vote determines the projected direction</li>
+            <li>O/H/L/C values are estimated from recent candle averages</li>
+          </ol>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Quick-Add Rules (Simple)</h4>
+          <p class="text-gray-500 text-xs mb-2">Created via the <strong>Add</strong> button dropdown.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-100">
+                  <th class="pb-2 font-medium pr-3">Rule</th>
+                  <th class="pb-2 font-medium pr-3">Condition</th>
+                  <th class="pb-2 font-medium">Predicts</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-600">
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">N Consecutive Bullish</td><td class="py-1.5">N bullish candles in a row</td><td class="py-1.5 text-red-600">Bearish (reversal)</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">N Consecutive Bearish</td><td class="py-1.5">N bearish candles in a row</td><td class="py-1.5 text-green-600">Bullish (reversal)</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">Long Upper Wick</td><td class="py-1.5">Upper wick ≥ ratio of total range</td><td class="py-1.5 text-red-600">Bearish</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">Long Lower Wick</td><td class="py-1.5">Lower wick ≥ ratio of total range</td><td class="py-1.5 text-green-600">Bullish</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">Volume Spike</td><td class="py-1.5">Volume ≥ multiplier × average (last 5)</td><td class="py-1.5 text-gray-700">Continuation</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">Marubozu</td><td class="py-1.5">Body ≥ 85% of total range</td><td class="py-1.5 text-gray-700">Continuation</td></tr>
+                <tr class="border-b border-gray-50"><td class="py-1.5 font-medium">Doji</td><td class="py-1.5">Body ≤ 10% of total range</td><td class="py-1.5 text-gray-700">Reversal</td></tr>
+                <tr><td class="py-1.5 font-medium">Engulfing</td><td class="py-1.5">Current body ≥ 1.2× previous, opposite direction</td><td class="py-1.5 text-gray-700">Reversal (follows current)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Bullish Reversal Preset (Configurable)</h4>
+          <p class="text-gray-600 leading-relaxed mb-2">
+            The <strong>Preset</strong> button creates a multi-condition rule using the v2 configurable format.
+            All conditions must be met for the rule to trigger (AND logic).
+          </p>
+          <div class="bg-gray-50 rounded-lg p-3 space-y-1.5 text-xs">
+            <div><span class="font-medium text-gray-900">Pattern:</span> <span class="text-gray-600">2 consecutive bearish candles</span></div>
+            <div><span class="font-medium text-gray-900">Wick Comparison (upper):</span> <span class="text-gray-600">Candle -2 upper wick &lt; Candle -1 upper wick (rising)</span></div>
+            <div><span class="font-medium text-gray-900">Wick Comparison (lower):</span> <span class="text-gray-600">Candle -2 lower wick &lt; Candle -1 lower wick (rising)</span></div>
+            <div><span class="font-medium text-gray-900">Action:</span> <span class="text-green-600 font-medium">Bullish</span></div>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Configurable Rule Conditions (v2)</h4>
+          <p class="text-gray-500 text-xs mb-2">Used by the <strong>Preset</strong> button. Conditions are AND-ed together.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-100">
+                  <th class="pb-2 font-medium pr-3">Condition Type</th>
+                  <th class="pb-2 font-medium pr-3">Parameters</th>
+                  <th class="pb-2 font-medium">Description</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-600">
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">pattern</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">consecutive, direction</td>
+                  <td class="py-1.5">Last N candles are all bullish/bearish</td>
+                </tr>
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">wick_comparison</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">candle_a, candle_b, part, comparison</td>
+                  <td class="py-1.5">Compare upper/lower wick size between two candles (offsets like -2, -1)</td>
+                </tr>
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">body_ratio</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">candle, comparison, value</td>
+                  <td class="py-1.5">Body-to-range ratio ≥ or ≤ threshold</td>
+                </tr>
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">volume_ratio</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">candle, multiplier, comparison</td>
+                  <td class="py-1.5">Volume vs recent average ≥ or ≤ multiplier</td>
+                </tr>
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">marubozu</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">candle, threshold</td>
+                  <td class="py-1.5">Body ≥ threshold of range (default 0.85)</td>
+                </tr>
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">doji</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">candle, threshold</td>
+                  <td class="py-1.5">Body ≤ threshold of range (default 0.10)</td>
+                </tr>
+                <tr class="border-b border-gray-50">
+                  <td class="py-1.5 font-medium">engulfing</td>
+                  <td class="py-1.5 font-mono text-[11px] whitespace-nowrap">min_mult</td>
+                  <td class="py-1.5">Current body ≥ min_mult × previous body, opposite direction</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Candle Offsets</h4>
+          <p class="text-gray-600 leading-relaxed">
+            In configurable rules, candle positions use negative offsets from the end of the array:
+            <code class="bg-gray-100 px-1 rounded">-1</code> = most recent candle,
+            <code class="bg-gray-100 px-1 rounded">-2</code> = previous candle,
+            <code class="bg-gray-100 px-1 rounded">-3</code> = two candles ago, etc.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Comparison Operators</h4>
+          <p class="text-gray-600 leading-relaxed">
+            Used by <code class="bg-gray-100 px-1 rounded">wick_comparison</code>, <code class="bg-gray-100 px-1 rounded">body_ratio</code>, and <code class="bg-gray-100 px-1 rounded">volume_ratio</code>:
+          </p>
+          <div class="flex flex-wrap gap-2 mt-1.5 text-xs">
+            <span class="bg-gray-100 px-2 py-0.5 rounded font-mono">gt</span>
+            <span class="text-gray-500">candle_b > candle_a</span>
+            <span class="bg-gray-100 px-2 py-0.5 rounded font-mono">lt</span>
+            <span class="text-gray-500">candle_b < candle_a</span>
+            <span class="bg-gray-100 px-2 py-0.5 rounded font-mono">gte</span>
+            <span class="text-gray-500">candle_b ≥ candle_a</span>
+            <span class="bg-gray-100 px-2 py-0.5 rounded font-mono">lte</span>
+            <span class="text-gray-500">candle_b ≤ candle_a</span>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Tips</h4>
+          <ul class="list-disc list-inside text-gray-600 space-y-1 leading-relaxed">
+            <li>Use multiple rules for better consensus — combine reversal + continuation rules</li>
+            <li>The <strong>Bullish Reversal</strong> preset is a good starting point for testing</li>
+            <li>Confidence = majority votes / total triggered rules</li>
+            <li>Rules are stored per-organization and persist across sessions</li>
+            <li>Toggle auto-refresh on Binance Live to re-project as new candles arrive</li>
+          </ul>
+        </div>
+      </div>
+      <div class="flex items-center justify-end px-6 py-3 border-t border-gray-100 flex-shrink-0">
+        <button @click="showDocs = false" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">Got it</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 function rightPanel() {
   return {
     open: false,
     showAddRule: false,
+    showDocs: false,
     loadingRules: false,
     rules: [],
     selectedRules: [],
