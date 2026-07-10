@@ -57,16 +57,24 @@ def seed_ai_providers():
             "models": [
                 {"name": "GPT-4o", "slug": "gpt-4o"},
                 {"name": "GPT-4o Mini", "slug": "gpt-4o-mini"},
+                {"name": "GPT-4.1", "slug": "gpt-4.1"},
+                {"name": "GPT-4.1 Mini", "slug": "gpt-4.1-mini"},
+                {"name": "GPT-4.1 Nano", "slug": "gpt-4.1-nano"},
                 {"name": "GPT-4 Turbo", "slug": "gpt-4-turbo"},
                 {"name": "GPT-3.5 Turbo", "slug": "gpt-3.5-turbo"},
+                {"name": "o3 Mini", "slug": "o3-mini"},
+                {"name": "o4 Mini", "slug": "o4-mini"},
             ],
         },
         {
             "name": "Gemini", "slug": "gemini",
             "base_url": "https://generativelanguage.googleapis.com/v1beta",
             "chat_endpoint": "/models/{model}:generateContent",
-            "default_model": "gemini-2.0-flash",
+            "default_model": "gemini-2.5-flash",
             "models": [
+                {"name": "Gemini 2.5 Flash", "slug": "gemini-2.5-flash"},
+                {"name": "Gemini 2.5 Pro", "slug": "gemini-2.5-pro"},
+                {"name": "Gemini 2.5 Flash Lite", "slug": "gemini-2.5-flash-lite"},
                 {"name": "Gemini 2.0 Flash", "slug": "gemini-2.0-flash"},
                 {"name": "Gemini 2.0 Pro", "slug": "gemini-2.0-pro"},
                 {"name": "Gemini 1.5 Pro", "slug": "gemini-1.5-pro"},
@@ -82,10 +90,13 @@ def seed_ai_providers():
                 {"name": "Grok 2", "slug": "grok-2"},
                 {"name": "Grok 2 Mini", "slug": "grok-2-mini"},
                 {"name": "Grok Beta", "slug": "grok-beta"},
+                {"name": "Grok 3", "slug": "grok-3"},
+                {"name": "Grok 3 Mini", "slug": "grok-3-mini"},
             ],
         },
     ]
     count = 0
+    model_count = 0
     for pdata in providers:
         provider = AIProvider.query.filter_by(slug=pdata["slug"]).first()
         if not provider:
@@ -103,7 +114,8 @@ def seed_ai_providers():
                 db.session.add(AIProviderModel(
                     provider_id=provider.id, name=mdata["name"], slug=mdata["slug"]
                 ))
-    if count:
+                model_count += 1
+    if count or model_count:
         db.session.commit()
     return count
 
