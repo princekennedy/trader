@@ -59,6 +59,9 @@
               <button @click="openPreview('{{ image_url }}', {{ job.id }}, '{{ job.filename }}')" class="text-gray-400 hover:text-blue-500 transition-colors" title="Preview candles">
                 <i class="fa-solid fa-eye"></i>
               </button>
+              <a href="{{ url_for('charts.job_detail', job_id=job.id) }}" class="text-gray-400 hover:text-primary-600 transition-colors ml-2" title="Job details">
+                <i class="fa-solid fa-arrow-right"></i>
+              </a>
             </td>
           </tr>
           {% endfor %}
