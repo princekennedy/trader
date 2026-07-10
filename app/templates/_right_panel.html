@@ -117,9 +117,14 @@
                 <p class="text-xs font-medium text-gray-900" x-text="rule.name"></p>
                 <p class="text-xs text-gray-500 truncate" x-text="describeRule(rule)"></p>
               </div>
-              <button @click="deleteRule(rule.id)" class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
-                <i class="fa-solid fa-trash-can text-xs"></i>
-              </button>
+              <div class="flex items-center gap-0.5 flex-shrink-0">
+                <button @click="previewRule(rule)" class="text-gray-300 hover:text-primary-500 transition-colors" title="View JSON">
+                  <i class="fa-solid fa-code text-xs"></i>
+                </button>
+                <button @click="deleteRule(rule.id)" class="text-gray-300 hover:text-red-500 transition-colors">
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
             </div>
           </template>
         </div>
@@ -307,6 +312,29 @@
       </div>
     </div>
   </div>
+
+  <div x-cloak x-show="showJsonPreview" x-transition:enter="transition-opacity ease-linear duration-200" x-transition:leave="transition-opacity ease-linear duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[60] bg-gray-600 bg-opacity-60 flex items-center justify-center p-4" @click="showJsonPreview = false">
+    <div x-cloak x-show="showJsonPreview" x-transition:enter="transition-all ease-out duration-200" x-transition:leave="transition-all ease-in duration-150" x-transition:enter-start="scale-95 opacity-0" x-transition:enter-end="scale-100 opacity-100" x-transition:leave-start="scale-100 opacity-100" x-transition:leave-end="scale-95 opacity-0" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" @click.stop>
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+        <h3 class="text-sm font-semibold text-gray-900">
+          <i class="fa-solid fa-code text-primary-500 mr-2"></i>
+          <span x-text="jsonPreviewRule ? jsonPreviewRule.name : ''"></span>
+        </h3>
+        <button @click="showJsonPreview = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4">
+        <pre class="text-xs font-mono bg-gray-50 rounded-lg p-3 border border-gray-200 overflow-x-auto whitespace-pre-wrap break-all" x-text="jsonPreviewContent"></pre>
+      </div>
+      <div class="flex items-center justify-end px-5 py-3 border-t border-gray-100 flex-shrink-0">
+        <button @click="copyJson()" class="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors mr-2">
+          <i class="fa-regular fa-copy mr-1"></i> Copy
+        </button>
+        <button @click="showJsonPreview = false" class="px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700 transition-colors">Close</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 function rightPanel() {
@@ -314,6 +342,9 @@ function rightPanel() {
     open: false,
     showAddRule: false,
     showDocs: false,
+    showJsonPreview: false,
+    jsonPreviewRule: null,
+    jsonPreviewContent: '',
     loadingRules: false,
     rules: [],
     selectedRules: [],
@@ -392,6 +423,11 @@ function rightPanel() {
     addPreset(name) {
       let conditions, presetName, desc;
       if (name === 'bullish_reversal') {
+        if (this.rules.some(r => r.name === 'Bullish Reversal')) {
+          const existing = this.rules.find(r => r.name === 'Bullish Reversal');
+          if (!this.selectedRules.includes(existing.id)) this.selectedRules.push(existing.id);
+          return;
+        }
         presetName = 'Bullish Reversal';
         desc = '2 bearish candles, wicks rising → next bullish';
         conditions = {
@@ -417,6 +453,18 @@ function rightPanel() {
           if (data.id) this.selectedRules.push(data.id);
         })
         .catch(() => {});
+    },
+
+    previewRule(rule) {
+      this.jsonPreviewRule = rule;
+      this.jsonPreviewContent = JSON.stringify(rule.conditions, null, 2);
+      this.showJsonPreview = true;
+    },
+
+    copyJson() {
+      if (this.jsonPreviewContent) {
+        navigator.clipboard.writeText(this.jsonPreviewContent).catch(() => {});
+      }
     },
 
     deleteRule(id) {
