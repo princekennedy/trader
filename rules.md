@@ -17,3 +17,11 @@ The second candle's upper wick is higher than the first candle's upper wick.
 The second candle's lower wick is higher than the first candle's lower wick.
 
 When both conditions are satisfied, it indicates bullish strength, and the expectation is that the next candle will be bullish (green/up).
+
+~~~
+{"version":2,"conditions":[
+  {"type":"pattern","params":{"consecutive":2,"direction":"bearish"}},
+  {"type":"wick_comparison","params":{"candle_a":-2,"candle_b":-1,"part":"upper","comparison":"gt"}},
+  {"type":"wick_comparison","params":{"candle_a":-2,"candle_b":-1,"part":"lower","comparison":"gt"}}
+],"action":"bullish"}
+~~~
