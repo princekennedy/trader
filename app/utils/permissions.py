@@ -42,7 +42,7 @@ PERMISSIONS = [
     {"name": "View Permissions", "slug": "permissions.read", "module": "permissions", "description": "View the permissions list"},
     {"name": "View Users", "slug": "users.read", "module": "users", "description": "View organization users"},
     {"name": "Manage User Roles", "slug": "users.manage_roles", "module": "users", "description": "Assign roles to users"},
-    {"name": "Use AI", "slug": "ai.use", "module": "ai", "description": "Use AI detection features"},
+    {"name": "Use Rules", "slug": "rules.use", "module": "rules", "description": "Use rule generation features"},
     {"name": "View Settings", "slug": "settings.view", "module": "settings", "description": "View user settings"},
     {"name": "Edit Settings", "slug": "settings.edit", "module": "settings", "description": "Edit user settings"},
 ]

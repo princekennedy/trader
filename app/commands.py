@@ -38,7 +38,7 @@ def seed_roles():
         if perm.id not in admin_perm_ids:
             admin.permissions.append(perm)
 
-    member_slugs = {"jobs.create", "jobs.read", "ai.use", "org.view", "roles.read", "permissions.read", "users.read", "settings.view"}
+    member_slugs = {"jobs.create", "jobs.read", "rules.use", "org.view", "roles.read", "permissions.read", "users.read", "settings.view"}
     member_perm_ids = {p.id for p in member.permissions}
     for perm in all_perms:
         if perm.slug in member_slugs and perm.id not in member_perm_ids:

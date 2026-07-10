@@ -10,7 +10,7 @@ from app.utils.storage import storage_available
 from app.utils.auth import org_required
 from app.routes.charts import _object_name, _upload_to_storage, allowed_file
 
-ai_bp = Blueprint("ai", __name__, url_prefix="/ai")
+rules_bp = Blueprint("rules", __name__, url_prefix="/rules")
 
 SYSTEM_PROMPT = """You are a trading rule generator. Given a user's description of a trading pattern or rule, generate a structured rule in the following JSON format:
 
@@ -29,7 +29,7 @@ Condition types:
 Respond with ONLY valid JSON, no explanation."""
 
 
-@ai_bp.route("/", methods=["GET", "POST"])
+@rules_bp.route("/", methods=["GET", "POST"])
 @login_required
 @org_required
 def index():
@@ -44,17 +44,17 @@ def index():
         file = request.files.get("image")
         if not file or not file.filename:
             flash("No file selected", "error")
-            return redirect(url_for("ai.index"))
+            return redirect(url_for("rules.index"))
         if not allowed_file(file.filename):
             flash("File type not allowed", "error")
-            return redirect(url_for("ai.index"))
+            return redirect(url_for("rules.index"))
         data = file.read()
         try:
             detections = detect_on_bytes(data)
         except Exception as e:
             current_app.logger.error("Detection error: %s", e)
             flash("AI model error: the model does not support this image format. Try a different image.", "error")
-            return redirect(url_for("ai.index"))
+            return redirect(url_for("rules.index"))
         results_list = detections
         if storage_available():
             file.seek(0)
@@ -69,10 +69,10 @@ def index():
             first_config = {"slug": p.slug, "default_model": p.default_model or ""}
             break
 
-    return render_template("ai.html", results=results_list, preview_url=preview_url, providers=providers, configured_provider_ids=configured_provider_ids, first_config=first_config)
+    return render_template("rules.html", results=results_list, preview_url=preview_url, providers=providers, configured_provider_ids=configured_provider_ids, first_config=first_config)
 
 
-@ai_bp.route("/config/models/<int:provider_id>")
+@rules_bp.route("/config/models/<int:provider_id>")
 @login_required
 @org_required
 def provider_models(provider_id):
@@ -80,7 +80,7 @@ def provider_models(provider_id):
     return jsonify([{"id": m.id, "name": m.name, "slug": m.slug} for m in models])
 
 
-@ai_bp.route("/config/save-key", methods=["POST"])
+@rules_bp.route("/config/save-key", methods=["POST"])
 @login_required
 @org_required
 def save_key():
@@ -102,7 +102,7 @@ def save_key():
     return jsonify({"ok": True})
 
 
-@ai_bp.route("/generate-rule", methods=["POST"])
+@rules_bp.route("/generate-rule", methods=["POST"])
 @login_required
 @org_required
 def generate_rule():
@@ -173,7 +173,7 @@ def _call_gemini(provider, model_slug, api_key, prompt):
     return body["candidates"][0]["content"]["parts"][0]["text"]
 
 
-@ai_bp.route("/save-rule", methods=["POST"])
+@rules_bp.route("/save-rule", methods=["POST"])
 @login_required
 @org_required
 def save_rule():

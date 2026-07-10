@@ -222,7 +222,7 @@ function onProviderChange() {
     populateModels(modelSel, modelsCache[id]);
     return;
   }
-  fetch('/ai/config/models/' + id).then(r => r.json()).then(data => {
+  fetch('/rules/config/models/' + id).then(r => r.json()).then(data => {
     modelsCache[id] = data;
     populateModels(modelSel, data);
   });
@@ -244,7 +244,7 @@ function saveConfig() {
     alert('Please select a provider and enter an API key.');
     return;
   }
-  fetch('/ai/config/save-key', {
+  fetch('/rules/config/save-key', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({provider_id: parseInt(providerId), api_key: key}),
@@ -276,7 +276,7 @@ function generateRule() {
 
   const modelSlug = '{{ first_config.default_model if first_config else "" }}';
 
-  fetch('/ai/generate-rule', {
+  fetch('/rules/generate-rule', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({prompt: prompt, provider_slug: providerSlug, model_slug: modelSlug}),
@@ -305,7 +305,7 @@ function saveRule() {
   const name = document.getElementById('rule-name').value.trim();
   if (!name) { alert('Please enter a rule name.'); return; }
   const description = document.getElementById('rule-description').value.trim();
-  fetch('/ai/save-rule', {
+  fetch('/rules/save-rule', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({name: name, description: description, conditions: currentRuleConditions}),
