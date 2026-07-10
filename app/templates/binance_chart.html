@@ -129,6 +129,7 @@
   </div>
 </div>
 {% endblock %}
+{% block extra_right_panel %}{% include "_right_panel.html" %}{% endblock %}
 {% block extra_scripts %}
 <script>
 function binanceChart() {
@@ -159,6 +160,7 @@ function binanceChart() {
         .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(data => {
           this.candleData = data.candles || [];
+          window.__candleData = this.candleData;
           this.renderChart(this.candleData);
           const last = this.candleData[this.candleData.length - 1];
           if (last) {
@@ -211,6 +213,7 @@ function binanceChart() {
           .then(r => r.json())
           .then(data => {
             this.candleData = data.candles || [];
+            window.__candleData = this.candleData;
             this.renderChart(this.candleData);
             const last = this.candleData[this.candleData.length - 1];
             if (last) {

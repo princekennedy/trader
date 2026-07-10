@@ -3,12 +3,14 @@
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
 {% include "_chart_component.html" %}
 {% endblock %}
+{% block extra_right_panel %}{% include "_right_panel.html" %}{% endblock %}
 {% block title %}Job #{{ job.id }}{% endblock %}
 {% block heading %}Job #{{ job.id }}{% endblock %}
 {% block subtitle %}{{ job.filename }}{% endblock %}
 {% block content %}
 {% set preview_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
 {% set export_url = url_for('charts.export_job', job_id=job.id) %}
+<script>window.__candleData = {{ candles_data|tojson }};</script>
 <div x-data='{
   ...window.chartView,
   previewUrl: {{ preview_url|tojson }},

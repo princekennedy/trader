@@ -188,6 +188,19 @@ class Strategy(db.Model, AuditMixin):
     organization = db.relationship("Organization", back_populates="strategies")
 
 
+class Rule(db.Model, AuditMixin):
+    __tablename__ = "rules"
+
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, default="", nullable=False)
+    conditions = db.Column(db.JSON, default=list, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    organization = db.relationship("Organization", foreign_keys=[organization_id])
+
+
 class PasswordResetToken(db.Model):
     __tablename__ = "password_reset_tokens"
 

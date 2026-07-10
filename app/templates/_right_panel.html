@@ -1,0 +1,203 @@
+<div x-data="rightPanel()" x-init="init()">
+  <div x-cloak x-show="open" x-transition:enter="transition-opacity ease-linear duration-200" x-transition:leave="transition-opacity ease-linear duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-40 bg-gray-600 bg-opacity-50" @click="open = false"></div>
+
+  <button @click="toggle()" class="fixed right-0 top-1/2 -translate-y-1/2 z-50 w-8 h-16 bg-white border border-gray-200 rounded-l-lg shadow-md flex items-center justify-center text-gray-400 hover:text-primary-600 hover:border-primary-300 transition-colors">
+    <i class="fa-solid" :class="open ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
+  </button>
+
+  <div x-cloak :class="open ? 'translate-x-0' : 'translate-x-full'" class="fixed top-0 right-0 z-50 h-full w-96 bg-white border-l border-gray-200 shadow-xl transition-transform duration-300 ease-in-out flex flex-col">
+    <div class="flex items-center justify-between px-4 h-14 border-b border-gray-100 flex-shrink-0">
+      <h3 class="text-sm font-semibold text-gray-900">
+        <i class="fa-solid fa-wand-magic-sparkles text-primary-500 mr-1.5"></i> Candle Projector
+      </h3>
+      <button @click="open = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-medium text-gray-500">Rules</span>
+        <button @click="showAddRule = !showAddRule" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+          <i class="fa-solid fa-plus mr-0.5"></i> Add Rule
+        </button>
+      </div>
+
+      <div x-cloak x-show="showAddRule" class="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+        <input x-model="newRule.name" type="text" placeholder="Rule name" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+        <div x-data="{ type: 'consecutive_bullish' }" class="space-y-2">
+          <select x-model="type" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+            <option value="consecutive_bullish">N consecutive bullish → bearish</option>
+            <option value="consecutive_bearish">N consecutive bearish → bullish</option>
+            <option value="long_upper_wick">Long upper wick (≥ ratio) → bearish</option>
+            <option value="long_lower_wick">Long lower wick (≥ ratio) → bullish</option>
+            <option value="volume_spike">Volume spike (≥ mult) → continuation</option>
+            <option value="marubozu">Marubozu (body ≥ 85%) → continuation</option>
+            <option value="doji">Doji (body ≤ 10%) → reversal</option>
+            <option value="engulfing">Engulfing pattern → reversal</option>
+          </select>
+          <template x-if="['consecutive_bullish','consecutive_bearish'].includes(type)">
+            <input x-model="newRule.value" type="number" min="2" max="10" placeholder="Count (e.g. 3)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+          </template>
+          <template x-if="['long_upper_wick','long_lower_wick'].includes(type)">
+            <input x-model="newRule.value" type="number" step="0.05" min="0.1" max="0.9" placeholder="Ratio (e.g. 0.5)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+          </template>
+          <template x-if="type === 'volume_spike'">
+            <input x-model="newRule.value" type="number" step="0.5" min="1.0" placeholder="Multiplier (e.g. 2.0)" class="w-full text-xs border border-gray-300 rounded px-2 py-1.5">
+          </template>
+          <button @click="addRule(type)" class="w-full px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors">
+            <i class="fa-solid fa-check mr-0.5"></i> Create
+          </button>
+        </div>
+      </div>
+
+      <template x-if="loadingRules">
+        <div class="text-center py-4 text-gray-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading rules...</div>
+      </template>
+
+      <template x-if="!loadingRules && rules.length === 0">
+        <div class="text-center py-6 text-gray-400">
+          <i class="fa-solid fa-ruler text-2xl mb-2"></i>
+          <p class="text-xs font-medium">No rules yet</p>
+          <p class="text-xs mt-1">Click "Add Rule" to create one</p>
+        </div>
+      </template>
+
+      <template x-for="rule in rules" :key="rule.id">
+        <div class="flex items-start gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+          <input type="checkbox" :value="rule.id" x-model="selectedRules" class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-medium text-gray-900" x-text="rule.name"></p>
+            <p class="text-xs text-gray-500 truncate" x-text="rule.description || rule.conditions.map(c => c.type).join(', ')"></p>
+          </div>
+          <button @click="deleteRule(rule.id)" class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        </div>
+      </template>
+
+      <div x-cloak x-show="rules.length > 0" class="pt-2">
+        <button @click="project()" :disabled="projecting || selectedRules.length === 0" :class="projecting || selectedRules.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-700'" class="w-full px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+          <i class="fa-solid" :class="projecting ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
+          <span x-text="projecting ? 'Projecting...' : 'Project Next Candle'"></span>
+        </button>
+      </div>
+
+      <div x-cloak x-show="projection" class="bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-900">Projected Candle</span>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="projection.direction === 'bullish' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+            <i :class="projection.direction === 'bullish' ? 'fa-arrow-up' : 'fa-arrow-down'" class="fa-solid"></i>
+            <span x-text="projection.direction"></span>
+          </span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div><span class="text-gray-500">Open:</span> <span class="font-mono font-medium" x-text="projection.open.toFixed(2)"></span></div>
+          <div><span class="text-gray-500">Close:</span> <span class="font-mono font-medium" x-text="projection.close.toFixed(2)"></span></div>
+          <div><span class="text-gray-500">High:</span> <span class="font-mono font-medium" x-text="projection.high.toFixed(2)"></span></div>
+          <div><span class="text-gray-500">Low:</span> <span class="font-mono font-medium" x-text="projection.low.toFixed(2)"></span></div>
+        </div>
+        <div class="text-xs text-gray-500 pt-1 border-t border-gray-200">
+          Confidence: <span class="font-semibold" x-text="(projection.confidence * 100).toFixed(0) + '%'"></span>
+          <span class="text-gray-300 mx-1">|</span>
+          Votes: <span class="text-green-600 font-medium" x-text="votes.bullish"></span>B /
+          <span class="text-red-600 font-medium" x-text="votes.bearish"></span>B
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function rightPanel() {
+  return {
+    open: false,
+    showAddRule: false,
+    loadingRules: false,
+    rules: [],
+    selectedRules: [],
+    projecting: false,
+    projection: null,
+    votes: { bullish: 0, bearish: 0, total: 0 },
+    newRule: { name: '', value: '' },
+
+    init() {
+      this.fetchRules();
+    },
+
+    toggle() {
+      this.open = !this.open;
+      if (this.open) this.fetchRules();
+    },
+
+    fetchRules() {
+      this.loadingRules = true;
+      fetch('/predict/api/rules')
+        .then(r => r.json())
+        .then(data => {
+          this.rules = data || [];
+          this.loadingRules = false;
+        })
+        .catch(() => { this.loadingRules = false; });
+    },
+
+    addRule(type) {
+      const conditions = [{ type: type }];
+      if (this.newRule.value) {
+        conditions[0].value = parseFloat(this.newRule.value) || this.newRule.value;
+      }
+      const name = this.newRule.name || type.replace(/_/g, ' ');
+      fetch('/predict/api/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, conditions: conditions }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          this.showAddRule = false;
+          this.newRule = { name: '', value: '' };
+          this.fetchRules();
+          if (data.id) this.selectedRules.push(data.id);
+        })
+        .catch(() => {});
+    },
+
+    deleteRule(id) {
+      fetch('/predict/api/rules/' + id, { method: 'DELETE' })
+        .then(() => {
+          this.rules = this.rules.filter(r => r.id !== id);
+          this.selectedRules = this.selectedRules.filter(s => s !== id);
+        })
+        .catch(() => {});
+    },
+
+    project() {
+      const data = this.getCandleData();
+      if (!data || data.length < 3) { alert('Need at least 3 candles'); return; }
+      this.projecting = true;
+      this.projection = null;
+      fetch('/predict/api/project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candles: data, rule_ids: this.selectedRules }),
+      })
+        .then(r => r.json())
+        .then(res => {
+          this.projecting = false;
+          if (res.projection) {
+            this.projection = res.projection;
+            this.votes = res.votes || { bullish: 0, bearish: 0, total: 0 };
+            this.$dispatch('projection', res.projection);
+          } else {
+            alert(res.reason || 'No rule triggered');
+          }
+        })
+        .catch(() => { this.projecting = false; });
+    },
+
+    getCandleData() {
+      if (window.__candleData && window.__candleData.length) return window.__candleData;
+      return [];
+    },
+  };
+}
+</script>
