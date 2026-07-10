@@ -73,7 +73,7 @@
               {% endif %}
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <button onclick="explainRule({{ r.id }}, {{ r.conditions|tojson }}, '{{ r.name|escape }}')" class="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors font-medium">
+              <button onclick='explainRule({{ r.id }}, {{ r.conditions|tojson }}, {{ r.name|tojson }})' class="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors font-medium">
                 <i class="fa-solid fa-lightbulb mr-1"></i> Explain
               </button>
               <button onclick="toggleConditions({{ r.id }})" class="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium">
@@ -137,7 +137,7 @@
 
 {% endblock %}
 
-{% block scripts %}
+{% block extra_scripts %}
 <script>
 let currentRuleConditions = null;
 
