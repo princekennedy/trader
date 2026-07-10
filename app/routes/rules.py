@@ -35,7 +35,7 @@ Respond with ONLY valid JSON, no explanation."""
 def index():
     results_list = []
     preview_url = None
-    org = g.organization
+    org = g.current_org
     providers = AIProvider.query.filter_by(is_active=True).all()
     user_keys = AIKey.query.filter_by(user_id=current_user.id, organization_id=org.id, is_active=True).all()
     configured_provider_ids = {k.provider_id for k in user_keys}
@@ -84,7 +84,7 @@ def provider_models(provider_id):
 @login_required
 @org_required
 def save_key():
-    org = g.organization
+    org = g.current_org
     data = request.get_json()
     provider_id = data.get("provider_id")
     api_key = data.get("api_key")
@@ -106,7 +106,7 @@ def save_key():
 @login_required
 @org_required
 def generate_rule():
-    org = g.organization
+    org = g.current_org
     data = request.get_json()
     prompt = data.get("prompt", "").strip()
     provider_slug = data.get("provider_slug", "")
@@ -177,7 +177,7 @@ def _call_gemini(provider, model_slug, api_key, prompt):
 @login_required
 @org_required
 def save_rule():
-    org = g.organization
+    org = g.current_org
     data = request.get_json()
     name = data.get("name", "").strip()
     description = data.get("description", "").strip()
