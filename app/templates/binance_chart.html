@@ -51,20 +51,81 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 p-4">
-    <template x-if="info">
-      <div class="flex flex-wrap items-center gap-4 mb-3 text-sm">
-        <span class="font-semibold text-gray-900" x-text="info.symbol"></span>
-        <span class="text-gray-500">|</span>
-        <span class="text-gray-700">O: <span class="font-medium" x-text="info.open"></span></span>
-        <span class="text-gray-700">H: <span class="font-medium" x-text="info.high"></span></span>
-        <span class="text-gray-700">L: <span class="font-medium" x-text="info.low"></span></span>
-        <span class="text-gray-700">C: <span class="font-medium" x-text="info.close"></span></span>
-        <span :class="info.change >= 0 ? 'text-green-600' : 'text-red-600'" class="font-medium" x-text="(info.change >= 0 ? '+' : '') + info.change.toFixed(2) + '%'"></span>
-        <span class="text-gray-400 text-xs" x-text="info.time"></span>
-      </div>
-    </template>
-    <div id="lwc-container" class="w-full" style="height:520px;"></div>
+  <div class="bg-white rounded-xl border border-gray-200">
+    <div class="flex-shrink-0 border-b border-gray-100">
+      <nav class="flex px-4 gap-1">
+        <button @click="activeTab = 'chart'" :class="activeTab === 'chart' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
+          <i class="fa-solid fa-chart-line mr-1.5"></i>Chart
+        </button>
+        <button @click="activeTab = 'dataset'" :class="activeTab === 'dataset' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
+          <i class="fa-solid fa-table mr-1.5"></i>Dataset
+        </button>
+      </nav>
+    </div>
+
+    <div class="p-4" x-show="activeTab === 'chart'">
+      <template x-if="info">
+        <div class="flex flex-wrap items-center gap-4 mb-3 text-sm">
+          <span class="font-semibold text-gray-900" x-text="info.symbol"></span>
+          <span class="text-gray-500">|</span>
+          <span class="text-gray-700">O: <span class="font-medium" x-text="info.open"></span></span>
+          <span class="text-gray-700">H: <span class="font-medium" x-text="info.high"></span></span>
+          <span class="text-gray-700">L: <span class="font-medium" x-text="info.low"></span></span>
+          <span class="text-gray-700">C: <span class="font-medium" x-text="info.close"></span></span>
+          <span :class="info.change >= 0 ? 'text-green-600' : 'text-red-600'" class="font-medium" x-text="(info.change >= 0 ? '+' : '') + info.change.toFixed(2) + '%'"></span>
+          <span class="text-gray-400 text-xs" x-text="info.time"></span>
+        </div>
+      </template>
+      <div id="lwc-container" class="w-full" style="height:520px;"></div>
+    </div>
+
+    <div x-cloak x-show="activeTab === 'dataset'" class="p-4">
+      <template x-if="candleData && candleData.length">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b border-gray-100">
+                <th class="pb-2 font-medium">#</th>
+                <th class="pb-2 font-medium">Time</th>
+                <th class="pb-2 font-medium">Direction</th>
+                <th class="pb-2 font-medium">Open</th>
+                <th class="pb-2 font-medium">High</th>
+                <th class="pb-2 font-medium">Low</th>
+                <th class="pb-2 font-medium">Close</th>
+                <th class="pb-2 font-medium">Volume</th>
+                <th class="pb-2 font-medium">Range</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(c, i) in candleData" :key="i">
+                <tr class="border-b border-gray-50 text-gray-700 text-xs">
+                  <td class="py-1.5" x-text="i + 1"></td>
+                  <td class="py-1.5 font-mono whitespace-nowrap" x-text="new Date(c.time * 1000).toLocaleString()"></td>
+                  <td class="py-1.5">
+                    <span :class="c.close >= c.open ? 'text-green-600' : 'text-red-600'" class="inline-flex items-center gap-1 text-xs font-medium">
+                      <i :class="c.close >= c.open ? 'fa-arrow-up' : 'fa-arrow-down'" class="fa-solid"></i>
+                      <span x-text="c.close >= c.open ? 'bullish' : 'bearish'"></span>
+                    </span>
+                  </td>
+                  <td class="py-1.5 font-mono" x-text="c.open.toFixed(c.open < 1 ? 6 : 2)"></td>
+                  <td class="py-1.5 font-mono" x-text="c.high.toFixed(c.high < 1 ? 6 : 2)"></td>
+                  <td class="py-1.5 font-mono" x-text="c.low.toFixed(c.low < 1 ? 6 : 2)"></td>
+                  <td class="py-1.5 font-mono" x-text="c.close.toFixed(c.close < 1 ? 6 : 2)"></td>
+                  <td class="py-1.5 font-mono" x-text="c.volume.toFixed(2)"></td>
+                  <td class="py-1.5 font-mono" x-text="(c.high - c.low).toFixed(c.high < 1 ? 6 : 2)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <template x-if="!candleData || !candleData.length">
+        <div class="flex flex-col items-center py-10 text-gray-400">
+          <i class="fa-solid fa-database text-4xl mb-3"></i>
+          <p class="text-sm font-medium">No data yet</p>
+        </div>
+      </template>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -79,6 +140,8 @@ function binanceChart() {
     limit: 100,
     autoRefresh: false,
     loading: false,
+    activeTab: 'chart',
+    candleData: [],
     info: null,
     _chart: null,
     _series: null,
@@ -95,10 +158,11 @@ function binanceChart() {
       fetch(url)
         .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(data => {
-          this.renderChart(data.candles);
-          const last = data.candles[data.candles.length - 1];
+          this.candleData = data.candles || [];
+          this.renderChart(this.candleData);
+          const last = this.candleData[this.candleData.length - 1];
           if (last) {
-            const first = data.candles[0];
+            const first = this.candleData[0];
             this.info = {
               symbol: data.symbol + ' ' + data.interval,
               open: last.open.toFixed(2),
@@ -146,10 +210,11 @@ function binanceChart() {
         fetch(url)
           .then(r => r.json())
           .then(data => {
-            this.renderChart(data.candles);
-            const last = data.candles[data.candles.length - 1];
+            this.candleData = data.candles || [];
+            this.renderChart(this.candleData);
+            const last = this.candleData[this.candleData.length - 1];
             if (last) {
-              const first = data.candles[0];
+              const first = this.candleData[0];
               this.info = {
                 symbol: data.symbol + ' ' + data.interval,
                 open: last.open.toFixed(2),
