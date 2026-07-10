@@ -4,9 +4,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import AIProvider, AIProviderModel, AIKey, Rule, Organization
+from app.models import AIProvider, AIProviderModel, AIKey, Rule
 from app.utils.detector import detect_on_bytes
-from app.utils.storage import get_storage, storage_available
+from app.utils.storage import storage_available
 from app.utils.auth import org_required
 from app.routes.charts import _object_name, _upload_to_storage, allowed_file
 
@@ -63,7 +63,13 @@ def index():
             preview_url = url_for("charts.uploaded_file", object_name=obj_name)
         flash(f"Detected {len(detections)} objects", "success")
 
-    return render_template("ai.html", results=results_list, preview_url=preview_url, providers=providers, configured_provider_ids=configured_provider_ids)
+    first_config = None
+    for p in providers:
+        if p.id in configured_provider_ids:
+            first_config = {"slug": p.slug, "default_model": p.default_model or ""}
+            break
+
+    return render_template("ai.html", results=results_list, preview_url=preview_url, providers=providers, configured_provider_ids=configured_provider_ids, first_config=first_config)
 
 
 @ai_bp.route("/config/models/<int:provider_id>")
