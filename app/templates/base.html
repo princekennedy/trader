@@ -75,23 +75,10 @@
                     <i class="fa-solid fa-coins w-5 text-center text-sm"></i>
                     <span>Binance Live</span>
                 </a>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-400 hover:bg-sidebar-800 hover:text-white transition-colors">
-                    <i class="fa-solid fa-file-csv w-5 text-center text-sm"></i>
-                    <span>Export</span>
-                </a>
-
                 <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-500 mt-6 mb-2">Analysis</p>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-400 hover:bg-sidebar-800 hover:text-white transition-colors">
-                    <i class="fa-solid fa-chart-simple w-5 text-center text-sm"></i>
-                    <span>Pattern Scanner</span>
-                </a>
                 <a href="{{ url_for('rules.index') }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('rules') else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
                     <i class="fa-solid fa-robot w-5 text-center text-sm"></i>
                     <span>Rules</span>
-                </a>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-400 hover:bg-sidebar-800 hover:text-white transition-colors">
-                    <i class="fa-solid fa-flask w-5 text-center text-sm"></i>
-                    <span>Backtest</span>
                 </a>
 
                 <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-500 mt-6 mb-2">Organization</p>
