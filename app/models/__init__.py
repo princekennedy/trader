@@ -188,6 +188,43 @@ class Strategy(db.Model, AuditMixin):
     organization = db.relationship("Organization", back_populates="strategies")
 
 
+class AIProvider(db.Model):
+    __tablename__ = "ai_providers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    base_url = db.Column(db.String(500), nullable=False)
+    chat_endpoint = db.Column(db.String(200), nullable=False, default="/chat/completions")
+    default_model = db.Column(db.String(100), nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    models = db.relationship("AIProviderModel", back_populates="provider", lazy="dynamic")
+
+
+class AIProviderModel(db.Model):
+    __tablename__ = "ai_provider_models"
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey("ai_providers.id"), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    slug = db.Column(db.String(200), nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    provider = db.relationship("AIProvider", back_populates="models")
+
+
+class AIKey(db.Model, AuditMixin):
+    __tablename__ = "ai_keys"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=False, index=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey("ai_providers.id"), nullable=False, index=True)
+    api_key = db.Column(db.String(500), nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+
 class Rule(db.Model, AuditMixin):
     __tablename__ = "rules"
 

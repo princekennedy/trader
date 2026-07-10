@@ -96,15 +96,18 @@ def project():
                 **result,
             })
 
-    if not predictions:
-        return jsonify({"projection": None, "reason": "No rule triggered"})
-
-    bullish_votes = sum(1 for p in predictions if p["direction"] == "bullish")
-    bearish_votes = sum(1 for p in predictions if p["direction"] == "bearish")
-
     avg_body = statistics.mean([abs(c["close"] - c["open"]) for c in candle_data[-10:]])
     avg_range = statistics.mean([c["high"] - c["low"] for c in candle_data[-10:]])
     avg_change = statistics.mean([c["close"] - c["open"] for c in candle_data[-10:]])
+
+    if predictions:
+        bullish_votes = sum(1 for p in predictions if p["direction"] == "bullish")
+        bearish_votes = sum(1 for p in predictions if p["direction"] == "bearish")
+        fallback = False
+    else:
+        bullish_votes = 0
+        bearish_votes = 0
+        fallback = True
 
     if bullish_votes > bearish_votes:
         direction = "bullish"
@@ -112,31 +115,34 @@ def project():
         direction = "bearish"
     else:
         direction = "bullish" if avg_change >= 0 else "bearish"
+        if not predictions:
+            direction = "bullish" if candle_data[-1]["close"] >= candle_data[-1]["open"] else "bearish"
 
-    proj_open = last_close = candle_data[-1]["close"]
+    last_c = candle_data[-1]["close"]
     body = avg_body * 0.8
     wick = avg_range * 0.3
     if direction == "bullish":
-        proj_close = proj_open + body
+        proj_close = last_c + body
         proj_high = proj_close + wick
-        proj_low = proj_open - wick * 0.5
+        proj_low = last_c - wick * 0.5
     else:
-        proj_close = proj_open - body
-        proj_high = proj_open + wick * 0.5
+        proj_close = last_c - body
+        proj_high = last_c + wick * 0.5
         proj_low = proj_close - wick
 
     return jsonify({
         "projection": {
             "time": (candle_data[-1].get("time", 0) or 0) + 86400,
-            "open": round(proj_open, 6),
+            "open": round(last_c, 6),
             "high": round(proj_high, 6),
             "low": round(proj_low, 6),
             "close": round(proj_close, 6),
             "direction": direction,
-            "confidence": round(max(bullish_votes, bearish_votes) / len(predictions), 2),
+            "confidence": round(max(bullish_votes, bearish_votes) / len(predictions), 2) if predictions else 0.5,
         },
         "votes": {"bullish": bullish_votes, "bearish": bearish_votes, "total": len(predictions)},
         "triggers": predictions,
+        "fallback": fallback,
     })
 
 
