@@ -86,15 +86,15 @@ def project():
     if not rules:
         return jsonify({"error": "No active rules selected"}), 400
 
-    last = candle_data[-1]
-    second_last = candle_data[-2]
-    third_last = candle_data[-3] if len(candle_data) >= 3 else None
-
     predictions = []
     for rule in rules:
-        result = evaluate_rule(rule.conditions, candle_data, last, second_last, third_last)
+        result = evaluate_rule(rule.conditions, candle_data)
         if result is not None:
-            predictions.append(result)
+            predictions.append({
+                "rule_id": rule.id,
+                "rule_name": rule.name,
+                **result,
+            })
 
     if not predictions:
         return jsonify({"projection": None, "reason": "No rule triggered"})
@@ -113,7 +113,7 @@ def project():
     else:
         direction = "bullish" if avg_change >= 0 else "bearish"
 
-    proj_open = last["close"]
+    proj_open = last_close = candle_data[-1]["close"]
     body = avg_body * 0.8
     wick = avg_range * 0.3
     if direction == "bullish":
@@ -127,7 +127,7 @@ def project():
 
     return jsonify({
         "projection": {
-            "time": (last.get("time", 0) or 0) + 86400,
+            "time": (candle_data[-1].get("time", 0) or 0) + 86400,
             "open": round(proj_open, 6),
             "high": round(proj_high, 6),
             "low": round(proj_low, 6),
@@ -136,10 +136,45 @@ def project():
             "confidence": round(max(bullish_votes, bearish_votes) / len(predictions), 2),
         },
         "votes": {"bullish": bullish_votes, "bearish": bearish_votes, "total": len(predictions)},
+        "triggers": predictions,
     })
 
 
-def evaluate_rule(conditions, candles, last, second_last, third_last):
+def _get_candle(candles, offset):
+    """Get candle by negative offset (e.g., -1 = last, -2 = second-to-last)."""
+    idx = len(candles) + offset
+    if idx < 0 or idx >= len(candles):
+        return None
+    return candles[idx]
+
+
+def _wick_upper(c):
+    return c["high"] - max(c["open"], c["close"])
+
+
+def _wick_lower(c):
+    return min(c["open"], c["close"]) - c["low"]
+
+
+def _body(c):
+    return abs(c["close"] - c["open"])
+
+
+def _range(c):
+    return c["high"] - c["low"]
+
+
+def evaluate_rule(conditions, candles):
+    if isinstance(conditions, dict) and conditions.get("version") == 2:
+        return _evaluate_v2(conditions, candles)
+    return _evaluate_v1(conditions, candles)
+
+
+def _evaluate_v1(conditions, candles):
+    """Old simple format: list of {type, value} conditions."""
+    last = candles[-1]
+    second_last = candles[-2] if len(candles) >= 2 else None
+    third_last = candles[-3] if len(candles) >= 3 else None
     triggered = []
     for cond in conditions:
         t = cond.get("type")
@@ -154,15 +189,13 @@ def evaluate_rule(conditions, candles, last, second_last, third_last):
                 triggered.append("bullish" if n >= 2 else None)
         elif t == "long_upper_wick":
             ratio = val if val else 0.5
-            upper = last["high"] - max(last["open"], last["close"])
-            rng = last["high"] - last["low"]
-            if rng > 0 and upper / rng >= ratio:
+            rng = _range(last)
+            if rng > 0 and _wick_upper(last) / rng >= ratio:
                 triggered.append("bearish")
         elif t == "long_lower_wick":
             ratio = val if val else 0.5
-            lower = min(last["open"], last["close"]) - last["low"]
-            rng = last["high"] - last["low"]
-            if rng > 0 and lower / rng >= ratio:
+            rng = _range(last)
+            if rng > 0 and _wick_lower(last) / rng >= ratio:
                 triggered.append("bullish")
         elif t == "volume_spike":
             mult = val if val else 2.0
@@ -172,31 +205,149 @@ def evaluate_rule(conditions, candles, last, second_last, third_last):
                 if avg_vol > 0 and vol / avg_vol >= mult:
                     triggered.append("bullish" if last["close"] >= last["open"] else "bearish")
         elif t == "marubozu":
-            body = abs(last["close"] - last["open"])
-            rng = last["high"] - last["low"]
-            if rng > 0 and body / rng >= 0.85:
+            rng = _range(last)
+            if rng > 0 and _body(last) / rng >= 0.85:
                 triggered.append("bullish" if last["close"] >= last["open"] else "bearish")
         elif t == "doji":
-            body = abs(last["close"] - last["open"])
-            rng = last["high"] - last["low"]
-            if rng > 0 and body / rng <= 0.1:
+            rng = _range(last)
+            if rng > 0 and _body(last) / rng <= 0.1:
                 triggered.append("bullish" if last["close"] >= last["open"] else "bearish")
         elif t == "engulfing":
-            if third_last:
-                prev_body = abs(second_last["close"] - second_last["open"])
-                curr_body = abs(last["close"] - last["open"])
+            if third_last and second_last:
+                curr_body = _body(last)
+                prev_body = _body(second_last)
                 if curr_body > prev_body * 1.2:
                     prev_dir = second_last["close"] >= second_last["open"]
                     curr_dir = last["close"] >= last["open"]
                     if prev_dir != curr_dir:
                         triggered.append("bullish" if curr_dir else "bearish")
-
     if not triggered:
         return None
     bullish = sum(1 for t in triggered if t == "bullish")
     bearish = sum(1 for t in triggered if t == "bearish")
-    direction = "bullish" if bullish >= bearish else "bearish"
-    return {"direction": direction, "triggered": triggered}
+    return {"direction": "bullish" if bullish >= bearish else "bearish", "triggered": triggered}
 
 
+def _evaluate_v2(config, candles):
+    """New structured format: {version:2, conditions:[...], action:'bullish'|'bearish'}."""
+    conditions = config.get("conditions", [])
+    action = config.get("action", "bullish")
 
+    for cond in conditions:
+        ctype = cond.get("type")
+        params = cond.get("params", {})
+
+        if ctype == "pattern":
+            consecutive = params.get("consecutive", 1)
+            direction = params.get("direction")
+            if len(candles) < consecutive:
+                return None
+            for i in range(consecutive):
+                c = candles[-(i + 1)]
+                if direction == "bearish" and c["close"] >= c["open"]:
+                    return None
+                if direction == "bullish" and c["close"] < c["open"]:
+                    return None
+
+        elif ctype == "wick_comparison":
+            ca = _get_candle(candles, params["candle_a"])
+            cb = _get_candle(candles, params["candle_b"])
+            if ca is None or cb is None:
+                return None
+            part = params.get("part", "upper")
+            comp = params.get("comparison", "gt")
+            if part == "upper":
+                va, vb = _wick_upper(ca), _wick_upper(cb)
+            else:
+                va, vb = _wick_lower(ca), _wick_lower(cb)
+            if comp == "gt" and not (va < vb):
+                return None
+            if comp == "lt" and not (va > vb):
+                return None
+            if comp == "gte" and not (va <= vb):
+                return None
+            if comp == "lte" and not (va >= vb):
+                return None
+
+        elif ctype == "body_ratio":
+            c = _get_candle(candles, params.get("candle", -1))
+            if c is None:
+                return None
+            comp = params.get("comparison", "gte")
+            val = params.get("value", 0.5)
+            rng = _range(c)
+            if rng == 0:
+                return None
+            ratio = _body(c) / rng
+            if comp == "gte" and not (ratio >= val):
+                return None
+            if comp == "lte" and not (ratio <= val):
+                return None
+
+        elif ctype == "volume_ratio":
+            c = _get_candle(candles, params.get("candle", -1))
+            if c is None:
+                return None
+            mult = params.get("multiplier", 2.0)
+            comp = params.get("comparison", "gte")
+            vol = c.get("volume", 0)
+            if not vol or len(candles) < 5:
+                return None
+            avg_vol = statistics.mean(
+                [x.get("volume", 0) for x in candles[-6:-1] if x.get("volume", 0) > 0]
+            )
+            if avg_vol == 0:
+                return None
+            if comp == "gte" and not (vol / avg_vol >= mult):
+                return None
+            if comp == "lte" and not (vol / avg_vol <= mult):
+                return None
+
+        elif ctype == "marubozu":
+            c = _get_candle(candles, params.get("candle", -1))
+            if c is None:
+                return None
+            threshold = params.get("threshold", 0.85)
+            rng = _range(c)
+            if rng == 0 or _body(c) / rng < threshold:
+                return None
+
+        elif ctype == "doji":
+            c = _get_candle(candles, params.get("candle", -1))
+            if c is None:
+                return None
+            threshold = params.get("threshold", 0.1)
+            rng = _range(c)
+            if rng == 0 or _body(c) / rng > threshold:
+                return None
+
+        elif ctype == "engulfing":
+            if len(candles) < 2:
+                return None
+            ca = candles[-2]
+            cb = candles[-1]
+            curr_body = _body(cb)
+            prev_body = _body(ca)
+            if curr_body <= prev_body * (params.get("min_mult", 1.2)):
+                return None
+            prev_dir = ca["close"] >= ca["open"]
+            curr_dir = cb["close"] >= cb["open"]
+            if prev_dir == curr_dir:
+                return None
+
+        elif ctype == "consecutive_direction":
+            c = _get_candle(candles, params.get("candle", -1))
+            if c is None:
+                return None
+            n = params.get("lookback", 2)
+            if len(candles) < n:
+                return None
+            direction = params.get("direction", "bearish")
+            for i in range(n):
+                cc = candles[-(i + 1)]
+                if direction == "bearish" and cc["close"] >= cc["open"]:
+                    return None
+                if direction == "bullish" and cc["close"] < cc["open"]:
+                    return None
+
+    return {"direction": action, "triggered": [c.get("type") for c in conditions]}

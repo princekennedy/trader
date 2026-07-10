@@ -18,9 +18,14 @@
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
       <div class="flex items-center justify-between">
         <span class="text-xs font-medium text-gray-500">Rules</span>
-        <button @click="showAddRule = !showAddRule" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
-          <i class="fa-solid fa-plus mr-0.5"></i> Add Rule
-        </button>
+        <div class="flex items-center gap-1">
+          <button @click="addPreset('bullish_reversal')" class="text-xs text-green-600 hover:text-green-700 font-medium" title="Add Bullish Reversal preset">
+            <i class="fa-solid fa-wand-magic-sparkles mr-0.5"></i> Preset
+          </button>
+          <button @click="showAddRule = !showAddRule" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+            <i class="fa-solid fa-plus mr-0.5"></i> Add
+          </button>
+        </div>
       </div>
 
       <div x-cloak x-show="showAddRule" class="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
@@ -59,7 +64,7 @@
         <div class="text-center py-6 text-gray-400">
           <i class="fa-solid fa-ruler text-2xl mb-2"></i>
           <p class="text-xs font-medium">No rules yet</p>
-          <p class="text-xs mt-1">Click "Add Rule" to create one</p>
+          <p class="text-xs mt-1">Click "Preset" to add a pre-built rule, or "Add" to create one</p>
         </div>
       </template>
 
@@ -68,7 +73,7 @@
           <input type="checkbox" :value="rule.id" x-model="selectedRules" class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-900" x-text="rule.name"></p>
-            <p class="text-xs text-gray-500 truncate" x-text="rule.description || rule.conditions.map(c => c.type).join(', ')"></p>
+            <p class="text-xs text-gray-500 truncate" x-text="describeRule(rule)"></p>
           </div>
           <button @click="deleteRule(rule.id)" class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
             <i class="fa-solid fa-trash-can text-xs"></i>
@@ -76,8 +81,8 @@
         </div>
       </template>
 
-      <div x-cloak x-show="rules.length > 0" class="pt-2">
-        <button @click="project()" :disabled="projecting || selectedRules.length === 0" :class="projecting || selectedRules.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-700'" class="w-full px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+      <div x-cloak x-show="selectedRules.length > 0" class="pt-2">
+        <button @click="project()" :disabled="projecting" :class="projecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-700'" class="w-full px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
           <i class="fa-solid" :class="projecting ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
           <span x-text="projecting ? 'Projecting...' : 'Project Next Candle'"></span>
         </button>
@@ -92,16 +97,26 @@
           </span>
         </div>
         <div class="grid grid-cols-2 gap-2 text-xs">
-          <div><span class="text-gray-500">Open:</span> <span class="font-mono font-medium" x-text="projection.open.toFixed(2)"></span></div>
-          <div><span class="text-gray-500">Close:</span> <span class="font-mono font-medium" x-text="projection.close.toFixed(2)"></span></div>
-          <div><span class="text-gray-500">High:</span> <span class="font-mono font-medium" x-text="projection.high.toFixed(2)"></span></div>
-          <div><span class="text-gray-500">Low:</span> <span class="font-mono font-medium" x-text="projection.low.toFixed(2)"></span></div>
+          <div><span class="text-gray-500">Open:</span> <span class="font-mono font-medium" x-text="projection.open.toFixed(typeof projection.open === 'number' && projection.open < 1 ? 6 : 2)"></span></div>
+          <div><span class="text-gray-500">Close:</span> <span class="font-mono font-medium" x-text="projection.close.toFixed(typeof projection.close === 'number' && projection.close < 1 ? 6 : 2)"></span></div>
+          <div><span class="text-gray-500">High:</span> <span class="font-mono font-medium" x-text="projection.high.toFixed(typeof projection.high === 'number' && projection.high < 1 ? 6 : 2)"></span></div>
+          <div><span class="text-gray-500">Low:</span> <span class="font-mono font-medium" x-text="projection.low.toFixed(typeof projection.low === 'number' && projection.low < 1 ? 6 : 2)"></span></div>
         </div>
-        <div class="text-xs text-gray-500 pt-1 border-t border-gray-200">
-          Confidence: <span class="font-semibold" x-text="(projection.confidence * 100).toFixed(0) + '%'"></span>
-          <span class="text-gray-300 mx-1">|</span>
-          Votes: <span class="text-green-600 font-medium" x-text="votes.bullish"></span>B /
-          <span class="text-red-600 font-medium" x-text="votes.bearish"></span>B
+        <div class="text-xs space-y-0.5">
+          <div class="text-gray-500">
+            Confidence: <span class="font-semibold" x-text="(projection.confidence * 100).toFixed(0) + '%'"></span>
+            <span class="text-gray-300 mx-1">|</span>
+            Votes: <span class="text-green-600 font-medium" x-text="votes.bullish"></span>B /
+            <span class="text-red-600 font-medium" x-text="votes.bearish"></span>B
+          </div>
+          <template x-if="triggers && triggers.length">
+            <div class="text-gray-400 text-[11px] pt-1 border-t border-gray-200 mt-1">
+              <span class="font-medium text-gray-500">Triggered:</span>
+              <template x-for="t in triggers" :key="t.rule_id">
+                <span class="ml-1" x-text="t.rule_name"></span>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -118,6 +133,7 @@ function rightPanel() {
     projecting: false,
     projection: null,
     votes: { bullish: 0, bearish: 0, total: 0 },
+    triggers: [],
     newRule: { name: '', value: '' },
 
     init() {
@@ -138,6 +154,31 @@ function rightPanel() {
           this.loadingRules = false;
         })
         .catch(() => { this.loadingRules = false; });
+    },
+
+    describeRule(rule) {
+      const conds = rule.conditions;
+      if (!conds) return '';
+      if (Array.isArray(conds)) {
+        if (conds.length === 0) return '';
+        if (conds[0].type) {
+          const parts = conds.map(c => c.type.replace(/_/g, ' ') + (c.value ? ' (' + c.value + ')' : ''));
+          return parts.join(', ');
+        }
+        return conds.join(', ');
+      }
+      if (conds.version === 2 && conds.conditions) {
+        return conds.conditions.map(c => {
+          const p = c.params || {};
+          const parts = [c.type.replace(/_/g, ' ')];
+          if (p.consecutive) parts.push('x' + p.consecutive);
+          if (p.direction) parts.push(p.direction);
+          if (p.part) parts.push(p.part + ' wick');
+          if (p.comparison === 'gt') parts.push('rising');
+          return parts.join(' ');
+        }).join(' → ') + ' → ' + conds.action;
+      }
+      return 'unknown config';
     },
 
     addRule(type) {
@@ -161,6 +202,36 @@ function rightPanel() {
         .catch(() => {});
     },
 
+    addPreset(name) {
+      let conditions, presetName, desc;
+      if (name === 'bullish_reversal') {
+        presetName = 'Bullish Reversal';
+        desc = '2 bearish candles, wicks rising → next bullish';
+        conditions = {
+          version: 2,
+          conditions: [
+            { type: 'pattern', params: { consecutive: 2, direction: 'bearish' } },
+            { type: 'wick_comparison', params: { candle_a: -2, candle_b: -1, part: 'upper', comparison: 'gt' } },
+            { type: 'wick_comparison', params: { candle_a: -2, candle_b: -1, part: 'lower', comparison: 'gt' } },
+          ],
+          action: 'bullish',
+        };
+      } else {
+        return;
+      }
+      fetch('/predict/api/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: presetName, description: desc, conditions: conditions }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          this.fetchRules();
+          if (data.id) this.selectedRules.push(data.id);
+        })
+        .catch(() => {});
+    },
+
     deleteRule(id) {
       fetch('/predict/api/rules/' + id, { method: 'DELETE' })
         .then(() => {
@@ -175,6 +246,7 @@ function rightPanel() {
       if (!data || data.length < 3) { alert('Need at least 3 candles'); return; }
       this.projecting = true;
       this.projection = null;
+      this.triggers = [];
       fetch('/predict/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,6 +258,7 @@ function rightPanel() {
           if (res.projection) {
             this.projection = res.projection;
             this.votes = res.votes || { bullish: 0, bearish: 0, total: 0 };
+            this.triggers = res.triggers || [];
             this.$dispatch('projection', res.projection);
           } else {
             alert(res.reason || 'No rule triggered');
