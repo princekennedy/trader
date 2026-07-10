@@ -2,13 +2,9 @@ import json
 import requests
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, g, jsonify
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 from app import db
 from app.models import AIProvider, AIProviderModel, AIKey, Rule
-from app.utils.detector import detect_on_bytes
-from app.utils.storage import storage_available
 from app.utils.auth import org_required
-from app.routes.charts import _object_name, _upload_to_storage, allowed_file
 
 rules_bp = Blueprint("rules", __name__, url_prefix="/rules")
 
@@ -28,40 +24,18 @@ Condition types:
 
 Respond with ONLY valid JSON, no explanation."""
 
+EXPLAIN_PROMPT = """You are a trading rule explainer. Given a rule's conditions in JSON format, explain in plain simple English what the rule does, what market pattern it detects, and what action it signals. Be concise (2-3 sentences). Focus on the trading logic, not the JSON structure."""
 
-@rules_bp.route("/", methods=["GET", "POST"])
+
+@rules_bp.route("/", methods=["GET"])
 @login_required
 @org_required
 def index():
-    results_list = []
-    preview_url = None
     org = g.current_org
     providers = AIProvider.query.filter_by(is_active=True).all()
     user_keys = AIKey.query.filter_by(user_id=current_user.id, organization_id=org.id, is_active=True).all()
     configured_provider_ids = {k.provider_id for k in user_keys}
-
-    if request.method == "POST":
-        file = request.files.get("image")
-        if not file or not file.filename:
-            flash("No file selected", "error")
-            return redirect(url_for("rules.index"))
-        if not allowed_file(file.filename):
-            flash("File type not allowed", "error")
-            return redirect(url_for("rules.index"))
-        data = file.read()
-        try:
-            detections = detect_on_bytes(data)
-        except Exception as e:
-            current_app.logger.error("Detection error: %s", e)
-            flash("AI model error: the model does not support this image format. Try a different image.", "error")
-            return redirect(url_for("rules.index"))
-        results_list = detections
-        if storage_available():
-            file.seek(0)
-            obj_name = _object_name(secure_filename(file.filename))
-            _upload_to_storage(file, obj_name)
-            preview_url = url_for("charts.uploaded_file", object_name=obj_name)
-        flash(f"Detected {len(detections)} objects", "success")
+    rules = Rule.query.filter_by(organization_id=org.id).order_by(Rule.created_at.desc()).all()
 
     first_config = None
     for p in providers:
@@ -69,7 +43,7 @@ def index():
             first_config = {"slug": p.slug, "default_model": p.default_model or ""}
             break
 
-    return render_template("rules.html", results=results_list, preview_url=preview_url, providers=providers, configured_provider_ids=configured_provider_ids, first_config=first_config)
+    return render_template("rules.html", providers=providers, configured_provider_ids=configured_provider_ids, first_config=first_config, rules=rules)
 
 
 @rules_bp.route("/config/models/<int:provider_id>")
@@ -125,9 +99,9 @@ def generate_rule():
 
     try:
         if provider.slug == "gemini":
-            rule_json = _call_gemini(provider, model_slug, ai_key.api_key, prompt)
+            rule_json = _call_gemini(provider, model_slug, ai_key.api_key, SYSTEM_PROMPT, prompt)
         else:
-            rule_json = _call_openai_compat(provider, model_slug, ai_key.api_key, prompt)
+            rule_json = _call_openai_compat(provider, model_slug, ai_key.api_key, SYSTEM_PROMPT, prompt, response_format={"type": "json_object"})
 
         parsed = json.loads(rule_json)
         return jsonify({"rule": parsed})
@@ -138,7 +112,42 @@ def generate_rule():
         return jsonify({"error": str(e)}), 500
 
 
-def _call_openai_compat(provider, model_slug, api_key, prompt):
+@rules_bp.route("/explain-rule", methods=["POST"])
+@login_required
+@org_required
+def explain_rule():
+    org = g.current_org
+    data = request.get_json()
+    conditions = data.get("conditions")
+    rule_name = data.get("name", "this rule")
+    provider_slug = data.get("provider_slug", "")
+    model_slug = data.get("model_slug", "")
+
+    if not conditions:
+        return jsonify({"error": "Rule conditions are required"}), 400
+
+    provider = AIProvider.query.filter_by(slug=provider_slug, is_active=True).first()
+    if not provider:
+        return jsonify({"error": "AI provider not found"}), 404
+
+    ai_key = AIKey.query.filter_by(user_id=current_user.id, organization_id=org.id, provider_id=provider.id, is_active=True).first()
+    if not ai_key:
+        return jsonify({"error": "API key not configured"}), 400
+
+    user_prompt = f"Explain rule '{rule_name}': {json.dumps(conditions)}"
+
+    try:
+        if provider.slug == "gemini":
+            explanation = _call_gemini(provider, model_slug, ai_key.api_key, EXPLAIN_PROMPT, user_prompt)
+        else:
+            explanation = _call_openai_compat(provider, model_slug, ai_key.api_key, EXPLAIN_PROMPT, user_prompt)
+        return jsonify({"explanation": explanation.strip()})
+    except Exception as e:
+        current_app.logger.error("AI rule explanation error: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+def _call_openai_compat(provider, model_slug, api_key, system_prompt, user_prompt, response_format=None):
     url = provider.base_url.rstrip("/") + provider.chat_endpoint
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -147,24 +156,25 @@ def _call_openai_compat(provider, model_slug, api_key, prompt):
     payload = {
         "model": model_slug or provider.default_model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
         ],
-        "response_format": {"type": "json_object"},
     }
+    if response_format:
+        payload["response_format"] = response_format
     resp = requests.post(url, headers=headers, json=payload, timeout=60)
     resp.raise_for_status()
     body = resp.json()
     return body["choices"][0]["message"]["content"]
 
 
-def _call_gemini(provider, model_slug, api_key, prompt):
+def _call_gemini(provider, model_slug, api_key, system_prompt, user_prompt):
     model = model_slug or provider.default_model
     endpoint = provider.chat_endpoint.replace("{model}", model)
     url = provider.base_url.rstrip("/") + endpoint + f"?key={api_key}"
     payload = {
         "contents": [{
-            "parts": [{"text": f"{SYSTEM_PROMPT}\n\nUser: {prompt}"}]
+            "parts": [{"text": f"{system_prompt}\n\nUser: {user_prompt}"}]
         }]
     }
     resp = requests.post(url, json=payload, timeout=60)

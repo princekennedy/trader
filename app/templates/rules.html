@@ -1,86 +1,9 @@
 {% extends "base.html" %}
-{% block title %}AI{% endblock %}
-{% block heading %}AI Tools{% endblock %}
-{% block subtitle %}Object detection & rule generation{% endblock %}
+{% block title %}Rules{% endblock %}
+{% block heading %}Rules{% endblock %}
+{% block subtitle %}Rule generator & library{% endblock %}
 {% block content %}
 
-<div class="mb-6 border-b border-gray-200">
-  <nav class="flex gap-6 -mb-px">
-    <button data-tab="detection" class="tab-btn text-sm font-medium pb-3 px-1 border-b-2 border-purple-600 text-purple-700 transition-colors">
-      <i class="fa-solid fa-microchip mr-1.5"></i>YOLO Detection
-    </button>
-    <button data-tab="rulegen" class="tab-btn text-sm font-medium pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
-      <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>Rule Generator
-    </button>
-  </nav>
-</div>
-
-<div id="tab-detection">
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <div class="lg:col-span-1">
-    <div class="bg-white rounded-xl border border-gray-200 p-5">
-      <h3 class="text-base font-semibold text-gray-900 mb-4">Analyze Image</h3>
-      <form method="POST" enctype="multipart/form-data" class="space-y-4">
-        <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-purple-400 transition-colors cursor-pointer" onclick="document.getElementById('ai-file-input').click()">
-          <i class="fa-solid fa-brain text-3xl text-gray-300 mb-2"></i>
-          <p class="text-sm text-gray-600">Upload a chart image to detect objects</p>
-          <input id="ai-file-input" type="file" name="image" accept="image/*" class="hidden" onchange="document.getElementById('ai-file-name').textContent = this.files[0]?.name || ''">
-          <p id="ai-file-name" class="text-xs text-purple-600 mt-2 font-medium"></p>
-        </div>
-        <button type="submit" class="w-full px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors">
-          <i class="fa-solid fa-magnifying-glass mr-1.5"></i> Detect Objects
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <div class="lg:col-span-2">
-    {% if preview_url %}
-    <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-      <h3 class="text-base font-semibold text-gray-900 mb-3">Image</h3>
-      <img src="{{ preview_url }}" alt="Uploaded image" class="w-full h-auto rounded-lg border border-gray-100">
-    </div>
-    {% endif %}
-
-    <div class="bg-white rounded-xl border border-gray-200 p-5">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-base font-semibold text-gray-900">Detections</h3>
-        <span class="text-xs text-gray-500">{{ results|length }} object(s)</span>
-      </div>
-      {% if results %}
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-gray-500 border-b border-gray-100">
-              <th class="pb-3 font-medium">Label</th>
-              <th class="pb-3 font-medium">Confidence</th>
-              <th class="pb-3 font-medium">Bounding Box</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for d in results %}
-            <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-              <td class="py-3 text-gray-900 font-medium capitalize">{{ d.label }}</td>
-              <td class="py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium {{ 'bg-green-50 text-green-700' if d.confidence > 0.7 else 'bg-yellow-50 text-yellow-700' }}">{{ '%.1f%%'|format(d.confidence * 100) }}</span></td>
-              <td class="py-3 text-xs text-gray-500 font-mono">{{ d.bbox[0] }},{{ d.bbox[1] }} &rarr; {{ d.bbox[2] }},{{ d.bbox[3] }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div class="flex flex-col items-center py-10 text-gray-400">
-        <i class="fa-solid fa-robot text-4xl mb-3"></i>
-        <p class="text-sm font-medium">No detections yet</p>
-        <p class="text-xs mt-1">Upload a chart image to run YOLO detection</p>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-</div>
-</div>
-
-<div id="tab-rulegen" class="hidden">
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   <div class="lg:col-span-1">
     <div class="bg-white rounded-xl border border-gray-200 p-5">
@@ -115,7 +38,7 @@
   </div>
 
   <div class="lg:col-span-2">
-    <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-base font-semibold text-gray-900">Generated Rule</h3>
       </div>
@@ -132,8 +55,48 @@
         </button>
       </div>
     </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-gray-900">Saved Rules</h3>
+        <span class="text-xs text-gray-500">{{ rules|length }} rule(s)</span>
+      </div>
+      {% if rules %}
+      <div class="space-y-3">
+        {% for r in rules %}
+        <div class="border border-gray-200 rounded-lg p-4">
+          <div class="flex items-start justify-between">
+            <div>
+              <h4 class="text-sm font-semibold text-gray-900">{{ r.name }}</h4>
+              {% if r.description %}
+              <p class="text-xs text-gray-500 mt-0.5">{{ r.description }}</p>
+              {% endif %}
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="explainRule({{ r.id }}, {{ r.conditions|tojson }}, '{{ r.name|escape }}')" class="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors font-medium">
+                <i class="fa-solid fa-lightbulb mr-1"></i> Explain
+              </button>
+              <button onclick="toggleConditions({{ r.id }})" class="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+                <i class="fa-solid fa-code mr-1"></i> JSON
+              </button>
+            </div>
+          </div>
+          <div id="conditions-{{ r.id }}" class="hidden mt-3 bg-gray-50 rounded-lg p-3">
+            <pre class="text-xs font-mono text-gray-700 whitespace-pre-wrap overflow-x-auto">{{ r.conditions|tojson(indent=2) }}</pre>
+          </div>
+          <div id="explanation-{{ r.id }}" class="hidden mt-3 bg-blue-50 rounded-lg p-3 text-sm text-blue-800"></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="flex flex-col items-center py-10 text-gray-400">
+        <i class="fa-solid fa-book text-4xl mb-3"></i>
+        <p class="text-sm font-medium">No saved rules</p>
+        <p class="text-xs mt-1">Generate a rule above and save it to see it here</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
-</div>
 </div>
 
 <div id="config-modal" class="fixed inset-0 z-50 hidden bg-black/40 flex items-center justify-center" onclick="if(event.target===this)closeConfigModal()">
@@ -177,20 +140,6 @@
 {% block scripts %}
 <script>
 let currentRuleConditions = null;
-
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.tab-btn').forEach(b => {
-      b.classList.remove('border-purple-600', 'text-purple-700');
-      b.classList.add('border-transparent', 'text-gray-500');
-    });
-    this.classList.remove('border-transparent', 'text-gray-500');
-    this.classList.add('border-purple-600', 'text-purple-700');
-    document.getElementById('tab-detection').classList.add('hidden');
-    document.getElementById('tab-rulegen').classList.add('hidden');
-    document.getElementById('tab-' + this.dataset.tab).classList.remove('hidden');
-  });
-});
 
 function openConfigModal() {
   document.getElementById('config-modal').classList.remove('hidden');
@@ -314,9 +263,42 @@ function saveRule() {
       alert('Rule saved successfully!');
       document.getElementById('rule-actions').classList.add('hidden');
       document.getElementById('rule-result').innerHTML = '<div class="flex flex-col items-center py-6 text-green-500"><i class="fa-solid fa-check-circle text-4xl mb-2"></i><p class="text-sm font-medium">Rule saved!</p></div>';
+      setTimeout(() => location.reload(), 1000);
     } else {
       alert(data.error || 'Failed to save rule');
     }
+  });
+}
+
+function toggleConditions(id) {
+  const el = document.getElementById('conditions-' + id);
+  el.classList.toggle('hidden');
+}
+
+function explainRule(id, conditions, name) {
+  const el = document.getElementById('explanation-' + id);
+  el.classList.remove('hidden');
+  el.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Generating explanation...';
+
+  const providerSlug = '{{ first_config.slug if first_config else "" }}';
+  if (!providerSlug) {
+    el.innerHTML = '<span class="text-red-600">Configure an AI provider first.</span>';
+    return;
+  }
+  const modelSlug = '{{ first_config.default_model if first_config else "" }}';
+
+  fetch('/rules/explain-rule', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({conditions: conditions, name: name, provider_slug: providerSlug, model_slug: modelSlug}),
+  }).then(r => r.json()).then(data => {
+    if (data.explanation) {
+      el.innerHTML = '<i class="fa-solid fa-lightbulb text-blue-600 mr-1.5"></i>' + data.explanation;
+    } else {
+      el.innerHTML = '<span class="text-red-600">' + (data.error || 'Failed to explain') + '</span>';
+    }
+  }).catch(err => {
+    el.innerHTML = '<span class="text-red-600">Request failed: ' + err.message + '</span>';
   });
 }
 </script>
