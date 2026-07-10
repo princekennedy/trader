@@ -24,7 +24,7 @@ def upgrade():
         sa.Column('base_url', sa.String(length=500), nullable=False),
         sa.Column('chat_endpoint', sa.String(length=200), nullable=False, server_default='/chat/completions'),
         sa.Column('default_model', sa.String(length=100), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
         sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('ai_providers', schema=None) as batch_op:
@@ -35,7 +35,7 @@ def upgrade():
         sa.Column('provider_id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(length=200), nullable=False),
         sa.Column('slug', sa.String(length=200), nullable=False),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
         sa.ForeignKeyConstraint(['provider_id'], ['ai_providers.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
@@ -48,7 +48,7 @@ def upgrade():
         sa.Column('organization_id', sa.Integer(), nullable=False),
         sa.Column('provider_id', sa.Integer(), nullable=False),
         sa.Column('api_key', sa.String(length=500), nullable=False),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
         sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
         sa.Column('created_by_id', sa.Integer(), nullable=True),
