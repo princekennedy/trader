@@ -1,4 +1,5 @@
 import json
+import re
 import requests
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, g, jsonify
 from flask_login import login_required, current_user
@@ -121,11 +122,12 @@ def generate_rule():
 
     try:
         if provider.slug == "gemini":
-            rule_json = _call_gemini(provider, model_slug, ai_key.api_key, SYSTEM_PROMPT, prompt)
+            rule_json = _call_gemini(provider, model_slug, ai_key.api_key, SYSTEM_PROMPT, prompt, json_output=True)
         else:
             rule_json = _call_openai_compat(provider, model_slug, ai_key.api_key, SYSTEM_PROMPT, prompt, response_format={"type": "json_object"})
 
-        parsed = json.loads(rule_json)
+        cleaned = _extract_json(rule_json)
+        parsed = json.loads(cleaned)
         return jsonify({"rule": parsed})
     except json.JSONDecodeError as e:
         return jsonify({"error": "AI returned invalid JSON", "raw": rule_json}), 500
@@ -169,6 +171,19 @@ def explain_rule():
         return jsonify({"error": str(e)}), 500
 
 
+def _extract_json(text):
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        text = text.strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start:end+1]
+    return text
+
+
 def _call_openai_compat(provider, model_slug, api_key, system_prompt, user_prompt, response_format=None):
     url = provider.base_url.rstrip("/") + provider.chat_endpoint
     headers = {
@@ -190,15 +205,17 @@ def _call_openai_compat(provider, model_slug, api_key, system_prompt, user_promp
     return body["choices"][0]["message"]["content"]
 
 
-def _call_gemini(provider, model_slug, api_key, system_prompt, user_prompt):
+def _call_gemini(provider, model_slug, api_key, system_prompt, user_prompt, json_output=False):
     model = model_slug or provider.default_model
     endpoint = provider.chat_endpoint.replace("{model}", model)
     url = provider.base_url.rstrip("/") + endpoint + f"?key={api_key}"
     payload = {
         "contents": [{
             "parts": [{"text": f"{system_prompt}\n\nUser: {user_prompt}"}]
-        }]
+        }],
     }
+    if json_output:
+        payload["generationConfig"] = {"response_mime_type": "application/json"}
     resp = requests.post(url, json=payload, timeout=60)
     resp.raise_for_status()
     body = resp.json()
