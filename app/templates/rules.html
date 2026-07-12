@@ -82,6 +82,9 @@
               <button onclick="toggleConditions({{ r.id }})" class="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium">
                 <i class="fa-solid fa-code mr-1"></i> JSON
               </button>
+              <button onclick="confirmDeleteRule({{ r.id }}, '{{ r.name|escape }}')" class="text-xs px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium">
+                <i class="fa-solid fa-trash-can mr-1"></i> Delete
+              </button>
             </div>
           </div>
           <div id="conditions-{{ r.id }}" class="hidden mt-3 bg-gray-50 rounded-lg p-3">
@@ -98,6 +101,26 @@
         <p class="text-xs mt-1">Generate a rule above and save it to see it here</p>
       </div>
       {% endif %}
+    </div>
+  </div>
+</div>
+
+<div id="delete-modal" class="fixed inset-0 z-50 hidden bg-black/40 flex items-center justify-center" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-trash-can text-red-500 text-sm"></i>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900">Delete Rule</h3>
+        <p class="text-xs text-gray-500">Are you sure you want to delete <span id="delete-rule-name" class="font-medium text-gray-700"></span>?</p>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="closeDeleteModal()" class="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+      <button id="delete-confirm-btn" onclick="doDeleteRule()" class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1">
+        <i class="fa-solid fa-trash-can"></i> Delete
+      </button>
     </div>
   </div>
 </div>
@@ -271,6 +294,40 @@ function saveRule() {
       alert(data.error || 'Failed to save rule');
     }
   });
+}
+
+let deleteTargetId = null;
+
+function confirmDeleteRule(id, name) {
+  deleteTargetId = id;
+  document.getElementById('delete-rule-name').textContent = name;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+  deleteTargetId = null;
+}
+
+function doDeleteRule() {
+  if (!deleteTargetId) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Deleting...';
+  fetch('/predict/api/rules/' + deleteTargetId, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        location.reload();
+      } else {
+        alert(data.error || 'Failed to delete rule');
+        closeDeleteModal();
+      }
+    })
+    .catch(err => {
+      alert('Request failed: ' + err.message);
+      closeDeleteModal();
+    });
 }
 
 function toggleConditions(id) {
