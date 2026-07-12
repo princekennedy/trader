@@ -38,10 +38,13 @@
           </div>
           <div class="mt-1.5 text-center text-[11px] text-gray-500">
             <template x-if="isFallback">
-              <span class="text-amber-600 font-medium mr-1"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>No rule triggered — fallback</span>
+              <span class="text-amber-600 font-medium"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>No rule triggered — using last candle</span>
+            </template>
+            <template x-if="tied">
+              <span class="text-amber-600 font-medium"><i class="fa-solid fa-scale-balanced mr-0.5"></i>Tied vote — using last candle</span>
             </template>
             <span class="font-medium" x-text="(projection.confidence * 100).toFixed(0) + '% confidence'"></span>
-            <template x-if="!isFallback">
+            <template x-if="!isFallback && !tied">
               <span><span class="text-gray-300 mx-1">·</span> <span class="text-green-600 font-medium" x-text="votes.bullish"></span>B / <span class="text-red-600 font-medium" x-text="votes.bearish"></span>B</span>
             </template>
           </div>
@@ -401,6 +404,7 @@ function rightPanel() {
     triggers: [],
     untriggered: [],
     isFallback: false,
+    tied: false,
     newRule: { name: '', value: '' },
 
     init() {
@@ -542,6 +546,7 @@ function rightPanel() {
       this.triggers = [];
       this.untriggered = [];
       this.isFallback = false;
+      this.tied = false;
       fetch('/predict/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

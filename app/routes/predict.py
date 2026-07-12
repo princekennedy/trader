@@ -106,7 +106,6 @@ def project():
 
     avg_body = statistics.mean([abs(c["close"] - c["open"]) for c in candle_data[-10:]])
     avg_range = statistics.mean([c["high"] - c["low"] for c in candle_data[-10:]])
-    avg_change = statistics.mean([c["close"] - c["open"] for c in candle_data[-10:]])
 
     if predictions:
         bullish_votes = sum(1 for p in predictions if p["direction"] == "bullish")
@@ -117,14 +116,17 @@ def project():
         bearish_votes = 0
         fallback = True
 
+    last_dir = "bullish" if candle_data[-1]["close"] >= candle_data[-1]["open"] else "bearish"
+
     if bullish_votes > bearish_votes:
         direction = "bullish"
+        tied = False
     elif bearish_votes > bullish_votes:
         direction = "bearish"
+        tied = False
     else:
-        direction = "bullish" if avg_change >= 0 else "bearish"
-        if not predictions:
-            direction = "bullish" if candle_data[-1]["close"] >= candle_data[-1]["open"] else "bearish"
+        direction = last_dir
+        tied = bool(predictions)
 
     last_c = candle_data[-1]["close"]
     body = avg_body * 0.8
@@ -152,6 +154,7 @@ def project():
         "triggers": predictions,
         "untriggered": untriggered,
         "fallback": fallback,
+        "tied": tied,
     })
 
 
