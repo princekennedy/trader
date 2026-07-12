@@ -47,12 +47,15 @@
         <p class="text-sm font-medium">No rule generated yet</p>
         <p class="text-xs mt-1">Describe a trading pattern and click Generate Rule</p>
       </div>
-      <div id="rule-actions" class="hidden flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
-        <input id="rule-name" type="text" placeholder="Rule name" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-        <input id="rule-description" type="text" placeholder="Short description (optional)" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-        <button onclick="saveRule()" class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
-          <i class="fa-solid fa-floppy-disk mr-1.5"></i> Save as Rule
-        </button>
+      <div id="rule-actions" class="hidden mt-4 pt-4 border-t border-gray-100">
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="rule-name" type="text" placeholder="Rule name (required)" class="flex-1 min-w-[160px] text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <input id="rule-description" type="text" placeholder="Description (optional)" class="flex-1 min-w-[160px] text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <button onclick="saveRule()" class="px-5 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap">
+            <i class="fa-solid fa-floppy-disk mr-1.5"></i> Save to Rules
+          </button>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">After saving, the rule will appear in the Saved Rules list below and be available in the Candle Projector.</p>
       </div>
     </div>
 
