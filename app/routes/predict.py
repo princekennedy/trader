@@ -235,9 +235,13 @@ def _evaluate_v1(conditions, candles):
 
 
 def _evaluate_v2(config, candles):
-    """New structured format: {version:2, conditions:[...], action:'bullish'|'bearish'}."""
+    """New structured format: {version:2, conditions:[...], action:'bullish'|'bearish'}.
+    Returns dict with direction+triggered on success, or direction+triggered+failures on failure."""
     conditions = config.get("conditions", [])
     action = config.get("action", "bullish")
+
+    def _fail(ctype, reason):
+        return {"direction": action, "triggered": [], "failures": [{"condition": ctype, "reason": reason}]}
 
     for cond in conditions:
         ctype = cond.get("type")
@@ -247,113 +251,116 @@ def _evaluate_v2(config, candles):
             consecutive = params.get("consecutive", 1)
             direction = params.get("direction")
             if len(candles) < consecutive:
-                return None
+                return _fail(ctype, f"Need {consecutive} candles, have {len(candles)}")
             for i in range(consecutive):
                 c = candles[-(i + 1)]
                 if direction == "bearish" and c["close"] >= c["open"]:
-                    return None
+                    return _fail(ctype, f"Candle -{i+1} is not bearish (close {c['close']:.2f} >= open {c['open']:.2f})")
                 if direction == "bullish" and c["close"] < c["open"]:
-                    return None
+                    return _fail(ctype, f"Candle -{i+1} is not bullish (close {c['close']:.2f} < open {c['open']:.2f})")
 
         elif ctype == "wick_comparison":
             ca = _get_candle(candles, params["candle_a"])
             cb = _get_candle(candles, params["candle_b"])
             if ca is None or cb is None:
-                return None
+                return _fail(ctype, f"Candle offset {params.get('candle_a')} or {params.get('candle_b')} out of range")
             part = params.get("part", "upper")
             comp = params.get("comparison", "gt")
             if part == "upper":
                 va, vb = _wick_upper(ca), _wick_upper(cb)
+                label = "upper wick"
             else:
                 va, vb = _wick_lower(ca), _wick_lower(cb)
+                label = "lower wick"
             if comp == "gt" and not (va < vb):
-                return None
+                return _fail(ctype, f"{label} candle_a ({va:.4f}) >= candle_b ({vb:.4f}), expected <")
             if comp == "lt" and not (va > vb):
-                return None
+                return _fail(ctype, f"{label} candle_a ({va:.4f}) <= candle_b ({vb:.4f}), expected >")
             if comp == "gte" and not (va <= vb):
-                return None
+                return _fail(ctype, f"{label} candle_a ({va:.4f}) > candle_b ({vb:.4f}), expected <=")
             if comp == "lte" and not (va >= vb):
-                return None
+                return _fail(ctype, f"{label} candle_a ({va:.4f}) < candle_b ({vb:.4f}), expected >=")
 
         elif ctype == "body_ratio":
             c = _get_candle(candles, params.get("candle", -1))
             if c is None:
-                return None
+                return _fail(ctype, f"Candle offset {params.get('candle')} out of range")
             comp = params.get("comparison", "gte")
             val = params.get("value", 0.5)
             rng = _range(c)
             if rng == 0:
-                return None
+                return _fail(ctype, "Candle range is zero, cannot compute ratio")
             ratio = _body(c) / rng
             if comp == "gte" and not (ratio >= val):
-                return None
+                return _fail(ctype, f"Body/range ratio {ratio:.3f} < {val}, expected >=")
             if comp == "lte" and not (ratio <= val):
-                return None
+                return _fail(ctype, f"Body/range ratio {ratio:.3f} > {val}, expected <=")
 
         elif ctype == "volume_ratio":
             c = _get_candle(candles, params.get("candle", -1))
             if c is None:
-                return None
+                return _fail(ctype, f"Candle offset {params.get('candle')} out of range")
             mult = params.get("multiplier", 2.0)
             comp = params.get("comparison", "gte")
             vol = c.get("volume", 0)
             if not vol or len(candles) < 5:
-                return None
+                return _fail(ctype, "Volume data unavailable or fewer than 5 candles")
             avg_vol = statistics.mean(
                 [x.get("volume", 0) for x in candles[-6:-1] if x.get("volume", 0) > 0]
             )
             if avg_vol == 0:
-                return None
-            if comp == "gte" and not (vol / avg_vol >= mult):
-                return None
-            if comp == "lte" and not (vol / avg_vol <= mult):
-                return None
+                return _fail(ctype, "Average volume is zero")
+            ratio = vol / avg_vol
+            if comp == "gte" and not (ratio >= mult):
+                return _fail(ctype, f"Volume ratio {ratio:.2f}x < {mult}x, expected >=")
+            if comp == "lte" and not (ratio <= mult):
+                return _fail(ctype, f"Volume ratio {ratio:.2f}x > {mult}x, expected <=")
 
         elif ctype == "marubozu":
             c = _get_candle(candles, params.get("candle", -1))
             if c is None:
-                return None
+                return _fail(ctype, f"Candle offset {params.get('candle')} out of range")
             threshold = params.get("threshold", 0.85)
             rng = _range(c)
             if rng == 0 or _body(c) / rng < threshold:
-                return None
+                return _fail(ctype, f"Body/range ratio {_body(c)/rng if rng else 0:.3f} < {threshold}, expected marubozu")
 
         elif ctype == "doji":
             c = _get_candle(candles, params.get("candle", -1))
             if c is None:
-                return None
+                return _fail(ctype, f"Candle offset {params.get('candle')} out of range")
             threshold = params.get("threshold", 0.1)
             rng = _range(c)
             if rng == 0 or _body(c) / rng > threshold:
-                return None
+                return _fail(ctype, f"Body/range ratio {_body(c)/rng if rng else 0:.3f} > {threshold}, expected doji")
 
         elif ctype == "engulfing":
             if len(candles) < 2:
-                return None
+                return _fail(ctype, "Need at least 2 candles for engulfing check")
             ca = candles[-2]
             cb = candles[-1]
             curr_body = _body(cb)
             prev_body = _body(ca)
             if curr_body <= prev_body * (params.get("min_mult", 1.2)):
-                return None
+                return _fail(ctype, f"Current body {curr_body:.4f} <= {params.get('min_mult', 1.2)}x prev body {prev_body:.4f}")
             prev_dir = ca["close"] >= ca["open"]
             curr_dir = cb["close"] >= cb["open"]
             if prev_dir == curr_dir:
-                return None
+                return _fail(ctype, "Current candle direction same as previous, not engulfing")
 
         elif ctype == "consecutive_direction":
             c = _get_candle(candles, params.get("candle", -1))
             if c is None:
-                return None
+                return _fail(ctype, f"Candle offset {params.get('candle')} out of range")
             n = params.get("lookback", 2)
             if len(candles) < n:
-                return None
+                return _fail(ctype, f"Need {n} candles, have {len(candles)}")
             direction = params.get("direction", "bearish")
             for i in range(n):
                 cc = candles[-(i + 1)]
                 if direction == "bearish" and cc["close"] >= cc["open"]:
-                    return None
+                    return _fail(ctype, f"Candle -{i+1} is not bearish (close {cc['close']:.2f} >= open {cc['open']:.2f})")
                 if direction == "bullish" and cc["close"] < cc["open"]:
-                    return None
+                    return _fail(ctype, f"Candle -{i+1} is not bullish (close {cc['close']:.2f} < open {cc['open']:.2f})")
 
     return {"direction": action, "triggered": [c.get("type") for c in conditions]}
