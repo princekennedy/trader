@@ -87,14 +87,22 @@ def project():
         return jsonify({"error": "No active rules selected"}), 400
 
     predictions = []
+    untriggered = []
     for rule in rules:
         result = evaluate_rule(rule.conditions, candle_data)
         if result is not None:
-            predictions.append({
+            triggered = result.get("triggered")
+            failures = result.get("failures")
+            entry = {
                 "rule_id": rule.id,
                 "rule_name": rule.name,
                 **result,
-            })
+            }
+            if triggered:
+                predictions.append(entry)
+            if failures:
+                entry.pop("triggered", None)
+                untriggered.append(entry)
 
     avg_body = statistics.mean([abs(c["close"] - c["open"]) for c in candle_data[-10:]])
     avg_range = statistics.mean([c["high"] - c["low"] for c in candle_data[-10:]])
@@ -142,6 +150,7 @@ def project():
         },
         "votes": {"bullish": bullish_votes, "bearish": bearish_votes, "total": len(predictions)},
         "triggers": predictions,
+        "untriggered": untriggered,
         "fallback": fallback,
     })
 

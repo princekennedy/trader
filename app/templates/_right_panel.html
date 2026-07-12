@@ -139,9 +139,31 @@
           <span x-text="projecting ? 'Projecting...' : 'Project Next Candle'"></span>
         </button>
 
-        <div x-cloak x-show="projection && triggers && triggers.length" class="text-xs text-gray-400 text-center">
-          <span class="font-medium text-gray-500">Triggered:</span>
-          <span x-text="triggers.map(t => t.rule_name).join(', ')"></span>
+        <div x-cloak x-show="projection" class="text-xs space-y-1">
+          <template x-if="triggers && triggers.length">
+            <div class="text-center text-gray-400">
+              <span class="font-medium text-gray-500">Triggered:</span>
+              <span x-text="triggers.map(t => t.rule_name).join(', ')"></span>
+            </div>
+          </template>
+          <template x-if="untriggered && untriggered.length">
+            <div class="text-left bg-gray-50 rounded p-2 space-y-1">
+              <div class="text-center text-gray-400 mb-1">
+                <span class="font-medium text-amber-600">No rule triggered:</span>
+              </div>
+              <template x-for="u in untriggered" :key="u.rule_id">
+                <div class="border-l-2 border-amber-300 pl-2 py-0.5">
+                  <div class="font-medium text-gray-700 text-[11px]" x-text="u.rule_name"></div>
+                  <template x-for="f in (u.failures || [])" :key="f.condition">
+                    <div class="flex items-start gap-1 text-gray-500">
+                      <span class="text-gray-400 mt-0.5 whitespace-nowrap">-</span>
+                      <span class="text-[10px] leading-tight"><span class="font-medium" x-text="f.condition.replace(/_/g, ' ') + ':'"></span> <span x-text="f.reason"></span></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -377,6 +399,7 @@ function rightPanel() {
     projection: null,
     votes: { bullish: 0, bearish: 0, total: 0 },
     triggers: [],
+    untriggered: [],
     isFallback: false,
     newRule: { name: '', value: '' },
 
@@ -517,6 +540,7 @@ function rightPanel() {
       this.projecting = true;
       this.projection = null;
       this.triggers = [];
+      this.untriggered = [];
       this.isFallback = false;
       fetch('/predict/api/project', {
         method: 'POST',
@@ -533,6 +557,7 @@ function rightPanel() {
             this.projection = res.projection;
             this.votes = res.votes || { bullish: 0, bearish: 0, total: 0 };
             this.triggers = res.triggers || [];
+            this.untriggered = res.untriggered || [];
             this.isFallback = res.fallback || false;
             this.$dispatch('projection', res.projection);
           } else {
