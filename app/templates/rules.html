@@ -244,8 +244,8 @@ function generateRule() {
     const html = '<div class="bg-gray-50 rounded-lg p-4"><pre class="text-xs font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto">' + JSON.stringify(data.rule, null, 2) + '</pre></div>';
     document.getElementById('rule-result').innerHTML = html;
     document.getElementById('rule-actions').classList.remove('hidden');
-    document.getElementById('rule-name').value = '';
-    document.getElementById('rule-description').value = '';
+    document.getElementById('rule-name').value = data.rule.name || '';
+    document.getElementById('rule-description').value = data.rule.description || '';
   }).catch(err => {
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> Generate Rule';

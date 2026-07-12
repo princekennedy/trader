@@ -11,7 +11,9 @@ rules_bp = Blueprint("rules", __name__, url_prefix="/rules")
 
 SYSTEM_PROMPT = """You are a trading rule generator. Given a user's description of a trading pattern or rule, generate a structured rule in the following JSON format:
 
-{"version":2,"conditions":[...],"action":"bullish"|"bearish"}
+{"version":2,"name":"Short Rule Name","description":"Brief explanation of what this rule detects","conditions":[...],"action":"bullish"|"bearish"}
+
+The `name` field must be a short descriptive title (2-6 words). The `description` field must be a one-sentence explanation of the pattern and what it predicts.
 
 Supported condition types (use ONLY these):
 - {"type":"pattern","params":{"consecutive":2,"direction":"bearish"}} — N consecutive candles of a direction (direction: "bullish" or "bearish")
