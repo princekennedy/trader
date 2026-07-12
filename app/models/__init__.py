@@ -238,6 +238,30 @@ class Rule(db.Model, AuditMixin):
     organization = db.relationship("Organization", foreign_keys=[organization_id])
 
 
+scheduler_rules = db.Table(
+    "scheduler_rules",
+    db.Column("scheduler_id", db.Integer, db.ForeignKey("schedulers.id"), primary_key=True),
+    db.Column("rule_id", db.Integer, db.ForeignKey("rules.id"), primary_key=True),
+)
+
+
+class Scheduler(db.Model, AuditMixin):
+    __tablename__ = "schedulers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    source_type = db.Column(db.String(20), nullable=False, default="binance")  # binance or image
+    source_config = db.Column(db.JSON, default=dict, nullable=False)
+    schedule_time = db.Column(db.Time, nullable=False)
+    email_recipients = db.Column(db.JSON, default=list, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_run_at = db.Column(db.DateTime, nullable=True)
+
+    organization = db.relationship("Organization", foreign_keys=[organization_id])
+    rules = db.relationship("Rule", secondary=scheduler_rules, lazy="dynamic")
+
+
 class PasswordResetToken(db.Model):
     __tablename__ = "password_reset_tokens"
 

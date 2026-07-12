@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Schedulers{% endblock %}
+{% block heading %}Schedulers{% endblock %}
+{% block subtitle %}Automated rule evaluation & alerts{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-5">
+  <div>
+    <p class="text-sm text-gray-500">Schedule rules to run automatically and send email alerts on bullish predictions.</p>
+  </div>
+  <a href="{{ url_for('scheduler.create') }}" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-1.5">
+    <i class="fa-solid fa-plus"></i> New Scheduler
+  </a>
+</div>
+
+{% if schedulers %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for s in schedulers %}
+  <div class="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
+    <div class="flex items-start justify-between mb-2">
+      <div class="min-w-0">
+        <h3 class="text-sm font-semibold text-gray-900 truncate">{{ s.name }}</h3>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ 'bg-blue-50 text-blue-700' if s.source_type == 'binance' else 'bg-purple-50 text-purple-700' }}">
+            <i class="fa-solid {{ 'fa-coins' if s.source_type == 'binance' else 'fa-image' }} mr-0.5"></i>
+            {{ s.source_type|title }}
+          </span>
+          <span class="text-xs text-gray-400">
+            <i class="fa-regular fa-clock mr-0.5"></i> {{ s.schedule_time.strftime('%H:%M') }}
+          </span>
+        </div>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer shrink-0">
+        <input type="checkbox" class="sr-only peer" {{ 'checked' if s.is_active else '' }} onchange="toggleScheduler({{ s.id }}, this)">
+        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+      </label>
+    </div>
+
+    <div class="text-xs text-gray-500 space-y-1 mb-3 flex-1">
+      {% if s.source_type == 'binance' %}
+      <div><span class="font-medium text-gray-600">Symbol:</span> {{ s.source_config.get('symbol', '-') }}</div>
+      <div><span class="font-medium text-gray-600">Interval:</span> {{ s.source_config.get('interval', '-') }}</div>
+      {% elif s.source_type == 'image' %}
+      <div><span class="font-medium text-gray-600">Job ID:</span> {{ s.source_config.get('job_id', '-') }}</div>
+      {% endif %}
+      <div><span class="font-medium text-gray-600">Rules:</span> {{ s.rules|length }} rule(s)</div>
+      <div><span class="font-medium text-gray-600">Recipients:</span> {{ s.email_recipients|join(', ') }}</div>
+      {% if s.last_run_at %}
+      <div><span class="font-medium text-gray-600">Last run:</span> {{ s.last_run_at.strftime('%Y-%m-%d %H:%M') }}</div>
+      {% else %}
+      <div><span class="text-gray-400">Never run</span></div>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center gap-2 pt-3 border-t border-gray-100">
+      <a href="{{ url_for('scheduler.edit', sched_id=s.id) }}" class="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+        <i class="fa-solid fa-pen mr-1"></i> Edit
+      </a>
+      <button onclick="confirmDelete({{ s.id }}, '{{ s.name|escape }}')" class="text-xs px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium">
+        <i class="fa-solid fa-trash-can mr-1"></i> Delete
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="delete-modal" class="fixed inset-0 z-50 hidden bg-black/40 flex items-center justify-center" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-trash-can text-red-500 text-sm"></i>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900">Delete Scheduler</h3>
+        <p class="text-xs text-gray-500">Are you sure you want to delete <span id="delete-name" class="font-medium text-gray-700"></span>?</p>
+      </div>
+    </div>
+    <form id="delete-form" method="POST" action="">
+      <div class="flex justify-end gap-2 mt-4">
+        <button type="button" onclick="closeDeleteModal()" class="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+        <button type="submit" class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1">
+          <i class="fa-solid fa-trash-can"></i> Delete
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+  <i class="fa-solid fa-calendar-clock text-5xl text-gray-300 mb-4"></i>
+  <h3 class="text-base font-semibold text-gray-900 mb-1">No Schedulers</h3>
+  <p class="text-sm text-gray-500 mb-4">Create a scheduler to automatically evaluate rules and get email alerts on bullish predictions.</p>
+  <a href="{{ url_for('scheduler.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">
+    <i class="fa-solid fa-plus"></i> Create Scheduler
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let deleteId = null;
+
+function confirmDelete(id, name) {
+  deleteId = id;
+  document.getElementById('delete-name').textContent = name;
+  document.getElementById('delete-form').action = '/scheduler/' + id + '/delete';
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+}
+
+function toggleScheduler(id, el) {
+  fetch('/scheduler/' + id + '/toggle', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { el.checked = !el.checked; }
+    })
+    .catch(() => { el.checked = !el.checked; });
+}
+</script>
+{% endblock %}

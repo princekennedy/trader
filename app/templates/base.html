@@ -80,6 +80,10 @@
                     <i class="fa-solid fa-robot w-5 text-center text-sm"></i>
                     <span>Rules</span>
                 </a>
+                <a href="{{ url_for('scheduler.index') }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('scheduler') else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
+                    <i class="fa-solid fa-calendar-clock w-5 text-center text-sm"></i>
+                    <span>Schedulers</span>
+                </a>
 
                 <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-500 mt-6 mb-2">Organization</p>
                 {% if g.current_org %}

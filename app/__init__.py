@@ -5,6 +5,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 load_dotenv()
 
@@ -61,4 +63,22 @@ def create_app():
         else:
             g.current_org = None
 
+    if not app.config.get("TESTING") and not app.config.get("SCHEDULER_DISABLED"):
+        _init_scheduler(app)
+
     return app
+
+
+def _init_scheduler(app):
+    sched = BackgroundScheduler(daemon=True)
+    from app.routes.scheduler import scheduler_tick
+    sched.add_job(
+        scheduler_tick,
+        trigger=IntervalTrigger(minutes=1),
+        args=[app],
+        id="scheduler_tick",
+        name="Check and run due schedulers",
+        replace_existing=True,
+    )
+    sched.start()
+    app.scheduler = sched
