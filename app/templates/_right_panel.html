@@ -564,6 +564,7 @@ function rightPanel() {
             this.triggers = res.triggers || [];
             this.untriggered = res.untriggered || [];
             this.isFallback = res.fallback || false;
+            this.tied = res.tied || false;
             this.$dispatch('projection', res.projection);
           } else {
             alert(res.reason || 'No rule triggered');
