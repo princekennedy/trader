@@ -12,15 +12,12 @@ SYSTEM_PROMPT = """You are a trading rule generator. Given a user's description 
 
 {"version":2,"conditions":[...],"action":"bullish"|"bearish"}
 
-Condition types:
-- {"type":"pattern","params":{"consecutive":2,"direction":"bearish"}} — N consecutive candles of a direction
-- {"type":"wick_comparison","params":{"candle_a":-2,"candle_b":-1,"part":"upper"|"lower","comparison":"gt"|"lt"}} — compare wick parts between two candles (candle_a and candle_b are 0-indexed relative to current, -1 = last candle)
-- {"type":"body_comparison","params":{"candle_a":-2,"candle_b":-1,"comparison":"gt"|"lt"}} — compare body sizes
-- {"type":"range","params":{"candle":-1,"part":"body"|"wick_upper"|"wick_lower"|"full","min_pips":0.0,"max_pips":100.0}} — candle part in pip range
-- {"type":"close_position","params":{"candle":-1,"position":"above"|"below","reference":"open"|"ema_9"|"ema_21"|"ema_50"}} — close relative to reference
-- {"type":"volume","params":{"candle":-1,"comparison":"gt"|"lt","multiplier":1.5}} — volume compared to average
-- {"type":"timeframe","params":{"value":"1m"|"5m"|"15m"|"1h"|"4h"|"1d"}} — required timeframe
-- {"type":"and"} / {"type":"or"} — logical grouping (children follow)
+Supported condition types (use ONLY these):
+- {"type":"pattern","params":{"consecutive":2,"direction":"bearish"}} — N consecutive candles of a direction (direction: "bullish" or "bearish")
+- {"type":"wick_comparison","params":{"candle_a":-2,"candle_b":-1,"part":"upper"|"lower","comparison":"gt"|"lt"}} — compare wick parts between two candles (-1 = last candle, -2 = second to last)
+- {"type":"body_ratio","params":{"candle":-1,"comparison":"gte"|"lte","value":0.5}} — body-to-range ratio check
+- {"type":"volume_ratio","params":{"candle":-1,"comparison":"gte"|"lte","multiplier":2.0}} — volume compared to 5-candle average
+- {"type":"engulfing","params":{"min_mult":1.2}} — current candle body >= multiplier x previous body, opposite direction
 
 Respond with ONLY valid JSON, no explanation."""
 

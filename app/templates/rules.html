@@ -237,7 +237,7 @@ function generateRule() {
       document.getElementById('rule-actions').classList.add('hidden');
       return;
     }
-    currentRuleConditions = data.rule.conditions || [];
+    currentRuleConditions = data.rule;
     const html = '<div class="bg-gray-50 rounded-lg p-4"><pre class="text-xs font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto">' + JSON.stringify(data.rule, null, 2) + '</pre></div>';
     document.getElementById('rule-result').innerHTML = html;
     document.getElementById('rule-actions').classList.remove('hidden');
