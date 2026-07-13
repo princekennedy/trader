@@ -259,7 +259,7 @@ class Scheduler(db.Model, AuditMixin):
     last_run_at = db.Column(db.DateTime, nullable=True)
 
     organization = db.relationship("Organization", foreign_keys=[organization_id])
-    rules = db.relationship("Rule", secondary=scheduler_rules, lazy="dynamic")
+    rules = db.relationship("Rule", secondary=scheduler_rules, lazy="select")
 
 
 class PasswordResetToken(db.Model):
