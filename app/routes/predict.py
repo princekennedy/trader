@@ -405,9 +405,20 @@ def ask_ai():
     if not question:
         return jsonify({"error": "Question is required"}), 400
 
-    provider = AIProvider.query.filter_by(slug=provider_slug, is_active=True).first()
+    provider = None
+    if provider_slug:
+        provider = AIProvider.query.filter_by(slug=provider_slug, is_active=True).first()
+
     if not provider:
-        provider = AIProvider.query.filter_by(is_active=True).first()
+        user_keys = AIKey.query.filter_by(
+            user_id=current_user.id, organization_id=g.current_org.id, is_active=True
+        ).all()
+        for uk in user_keys:
+            p = AIProvider.query.get(uk.provider_id)
+            if p and p.is_active:
+                provider = p
+                break
+
     if not provider:
         return jsonify({"error": "No AI provider configured. Add an API key in Rules page first."}), 400
 
@@ -415,8 +426,6 @@ def ask_ai():
         user_id=current_user.id, organization_id=g.current_org.id,
         provider_id=provider.id, is_active=True
     ).first()
-    if not ai_key:
-        return jsonify({"error": f"No API key configured for {provider.name}. Add one in Rules page."}), 400
 
     last_40 = candle_data[-40:]
     rows = []
