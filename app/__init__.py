@@ -1,3 +1,4 @@
+import logging
 import os
 import tempfile
 from flask import Flask, g
@@ -25,6 +26,12 @@ def load_user(user_id):
 
 def create_app():
     app = Flask(__name__, instance_relative_config=True)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev")
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(

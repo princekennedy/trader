@@ -1,3 +1,4 @@
+import logging
 import requests
 from datetime import datetime, time as dtime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, g
@@ -7,6 +8,8 @@ from app.models import Organization, Rule, ExtractionJob, Scheduler, Notificatio
 from app.utils.auth import org_required
 from app.routes.predict import evaluate_rule
 from app.utils.email import send_email
+
+logger = logging.getLogger(__name__)
 
 scheduler_bp = Blueprint("scheduler", __name__, url_prefix="/scheduler")
 
@@ -204,6 +207,26 @@ def toggle(sched_id):
     return jsonify({"ok": True, "is_active": scheduler.is_active})
 
 
+@scheduler_bp.route("/status")
+@login_required
+def scheduler_status():
+    from flask import current_app
+    sched = getattr(current_app, "scheduler", None)
+    if sched is None:
+        return jsonify({"running": False, "message": "APScheduler not initialized (SCHEDULER_DISABLED may be set)"})
+    jobs = [
+        {"id": j.id, "name": j.name, "next_run_time": str(j.next_run_time)}
+        for j in sched.get_jobs()
+    ]
+    active = Scheduler.query.filter_by(organization_id=g.current_org.id, is_active=True).count()
+    total = Scheduler.query.filter_by(organization_id=g.current_org.id).count()
+    return jsonify({
+        "running": sched.running,
+        "jobs": jobs,
+        "schedulers": {"active": active, "total": total},
+    })
+
+
 def _build_schedule_config(data, schedule_type):
     if schedule_type == "interval":
         try:
@@ -297,15 +320,22 @@ def scheduler_tick(app):
     with app.app_context():
         now = datetime.now()
         due = Scheduler.query.filter(Scheduler.is_active == True).all()
+        logger.info("Scheduler tick: checking %d active schedulers", len(due))
 
         for sched in due:
             if _is_due(sched, now):
+                logger.info("Scheduler %d (%s) is due — running", sched.id, sched.name)
                 try:
-                    _run_scheduler(sched)
-                    sched.last_run_at = now
-                    db.session.commit()
+                    ok = _run_scheduler(sched)
+                    if ok:
+                        sched.last_run_at = now
+                        db.session.commit()
+                        logger.info("Scheduler %d completed successfully", sched.id)
+                    else:
+                        logger.warning("Scheduler %d run returned no actionable result", sched.id)
                 except Exception as e:
-                    app.logger.error("Scheduler %d tick error: %s", sched.id, e)
+                    db.session.rollback()
+                    logger.exception("Scheduler %d tick error: %s", sched.id, e)
 
 
 def _is_due(sched, now):
@@ -355,11 +385,15 @@ def _run_scheduler(sched):
 
     if sched.source_type == "binance":
         cfg = sched.source_config
-        candles = _fetch_binance_candles(
-            cfg.get("symbol", "BTCUSDT"),
-            cfg.get("interval", "1h"),
-            cfg.get("lookback", 50),
-        )
+        symbol = cfg.get("symbol", "BTCUSDT")
+        interval = cfg.get("interval", "1h")
+        lookback = cfg.get("lookback", 50)
+        logger.info("Fetching %d %s candles for %s", lookback, interval, symbol)
+        candles = _fetch_binance_candles(symbol, interval, lookback)
+        if candles is None:
+            logger.error("Failed to fetch candles from Binance for %s", symbol)
+            return False
+        logger.info("Fetched %d candles", len(candles))
     elif sched.source_type == "image":
         job_id = sched.source_config.get("job_id")
         if job_id:
@@ -371,12 +405,17 @@ def _run_scheduler(sched):
                      "close": c.close, "volume": c.volume or 0, "time": 0}
                     for c in candle_rows
                 ]
+                logger.info("Loaded %d candles from job %d", len(candles), job_id)
 
     if not candles or len(candles) < 3:
-        return
+        logger.warning("Not enough candles (%s) to evaluate rules", len(candles) if candles else 0)
+        return False
 
     bullish_votes = 0
     bearish_votes = 0
+    rule_count = len(sched.rules)
+    logger.info("Evaluating %d rules on %d candles", rule_count, len(candles))
+
     for rule in sched.rules:
         result = evaluate_rule(rule.conditions, candles)
         if result is not None:
@@ -386,6 +425,9 @@ def _run_scheduler(sched):
                     bullish_votes += 1
                 else:
                     bearish_votes += 1
+                logger.info("Rule '%s' triggered %s", rule.name, result["direction"])
+
+    logger.info("Votes: %dB / %dB", bullish_votes, bearish_votes)
 
     notify = sched.notify_on or "bullish"
     should_send = (
@@ -394,7 +436,12 @@ def _run_scheduler(sched):
         (notify == "both" and bullish_votes != bearish_votes)
     )
     if should_send:
+        logger.info("Sending alert for scheduler %d (%s)", sched.id, sched.name)
         _send_alert(sched, candles, bullish_votes, bearish_votes)
+    else:
+        logger.info("Skipping alert: notify=%s votes=%dB/%dB", notify, bullish_votes, bearish_votes)
+
+    return True
 
 
 def _send_alert(sched, candles, bullish_votes, bearish_votes):
