@@ -463,7 +463,9 @@ def _send_alert(sched, candles, bullish_votes, bearish_votes):
             bearish_votes=bearish_votes,
         )
         subject = f"[{direction.title()} Alert] {sched.name} - {source_label}"
-        send_email(email, subject, html)
+        ok = send_email(email, subject, html)
+        if not ok:
+            logger.warning("Failed to send alert email to %s for scheduler %d", email, sched.id)
 
     user_id = sched.created_by_id
     if user_id:

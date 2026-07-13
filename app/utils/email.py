@@ -1,9 +1,12 @@
+import logging
 import os
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import render_template
+
+logger = logging.getLogger(__name__)
 
 
 def _get_config():
@@ -20,6 +23,7 @@ def _get_config():
 def send_email(to_email, subject, html_body, text_body=None):
     cfg = _get_config()
     if not cfg["username"] or not cfg["password"]:
+        logger.warning("Email not sent: MAIL_USERNAME or MAIL_PASSWORD not configured")
         return False
 
     msg = MIMEMultipart("alternative")
@@ -42,8 +46,10 @@ def send_email(to_email, subject, html_body, text_body=None):
             with smtplib.SMTP(cfg["server"], cfg["port"]) as server:
                 server.login(cfg["username"], cfg["password"])
                 server.sendmail(cfg["default_sender"], to_email, msg.as_string())
+        logger.info("Email sent to %s: %s", to_email, subject)
         return True
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to send email to %s: %s", to_email, e)
         return False
 
 
