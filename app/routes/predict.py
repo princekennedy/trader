@@ -1,9 +1,11 @@
+import json
 import statistics
-from flask import Blueprint, render_template, request, jsonify, g
+from flask import Blueprint, render_template, request, jsonify, g, current_app
 from flask_login import login_required, current_user
 from app import db
-from app.models import Rule
+from app.models import Rule, AIProvider, AIKey
 from app.utils.auth import org_required
+from app.routes.rules import _call_openai_compat, _call_gemini
 
 predict_bp = Blueprint("predict", __name__, url_prefix="/predict")
 
@@ -376,3 +378,66 @@ def _evaluate_v2(config, candles):
                     return _fail(ctype, f"Candle -{i+1} is not bullish (close {cc['close']:.2f} < open {cc['open']:.2f})")
 
     return {"direction": action, "triggered": [c.get("type") for c in conditions]}
+
+
+AI_ANALYSIS_PROMPT = """You are a professional trading analyst. Given a dataset of recent OHLCV candlesticks, you answer the user's question about the market data in clear, actionable language.
+
+Here is the candle data (most recent first):
+{candle_summary}
+
+Analyze the data carefully. Look at price action, trends, patterns, volume, volatility, support/resistance, and any other relevant technical factors.
+
+Answer the user's question concisely but thoroughly (2-4 paragraphs). Be specific — reference actual price levels, candle patterns, and numerical observations from the data. Do NOT make predictions about the future beyond what can be inferred from the data."""
+
+
+@predict_bp.route("/api/ask-ai", methods=["POST"])
+@login_required
+@org_required
+def ask_ai():
+    data = request.get_json(force=True)
+    candle_data = data.get("candles", [])
+    question = data.get("question", "").strip()
+    provider_slug = data.get("provider_slug", "")
+    model_slug = data.get("model_slug", "")
+
+    if not candle_data or len(candle_data) < 3:
+        return jsonify({"error": "Need at least 3 candles"}), 400
+    if not question:
+        return jsonify({"error": "Question is required"}), 400
+
+    provider = AIProvider.query.filter_by(slug=provider_slug, is_active=True).first()
+    if not provider:
+        provider = AIProvider.query.filter_by(is_active=True).first()
+    if not provider:
+        return jsonify({"error": "No AI provider configured. Add an API key in Rules page first."}), 400
+
+    ai_key = AIKey.query.filter_by(
+        user_id=current_user.id, organization_id=g.current_org.id,
+        provider_id=provider.id, is_active=True
+    ).first()
+    if not ai_key:
+        return jsonify({"error": f"No API key configured for {provider.name}. Add one in Rules page."}), 400
+
+    last_40 = candle_data[-40:]
+    rows = []
+    for c in reversed(last_40):
+        direction = "bullish" if c["close"] >= c["open"] else "bearish"
+        rows.append(
+            f"  O:{c['open']:.4f} H:{c['high']:.4f} L:{c['low']:.4f} C:{c['close']:.4f} "
+            f"V:{c.get('volume',0):.2f} {direction}"
+        )
+    candle_summary = f"{len(last_40)} candles (most recent first):\n" + "\n".join(rows)
+
+    user_prompt = f"{AI_ANALYSIS_PROMPT.format(candle_summary=candle_summary)}\n\nUser question: {question}"
+
+    try:
+        if provider.slug == "gemini":
+            answer = _call_gemini(provider, model_slug, ai_key.api_key,
+                                  "You are a professional trading analyst.", user_prompt)
+        else:
+            answer = _call_openai_compat(provider, model_slug, ai_key.api_key,
+                                         "You are a professional trading analyst.", user_prompt)
+        return jsonify({"answer": answer.strip()})
+    except Exception as e:
+        current_app.logger.error("AI ask error: %s", e)
+        return jsonify({"error": str(e)}), 500
