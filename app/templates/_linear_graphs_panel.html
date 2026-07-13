@@ -26,6 +26,7 @@ if (!window.__lgEngine) {
         if (!seriesList.length) return;
         const handles = [];
         seriesList.forEach(s => {
+          if (s.enabled === false) return;
           const values = candleData.map((c, i) => {
             const t = c.time || (i + 1) * 86400;
             const v = this._compute(c, s.source);
@@ -124,12 +125,18 @@ if (!window.__lgEngine) {
         <template x-if="g.description">
           <p class="text-[10px] text-gray-500 leading-relaxed line-clamp-2" x-text="g.description"></p>
         </template>
-        <div class="flex flex-wrap gap-1">
-          <template x-for="s in (typeof g.config === 'string' ? JSON.parse(g.config).series : g.config.series || [])" :key="s.source + (s.label || '')">
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium" :style="'background:' + s.color + '20;color:' + s.color">
-              <span :style="'background:' + s.color" class="w-1.5 h-1.5 rounded-full"></span>
-              <span x-text="s.label || s.source"></span>
-            </span>
+        <div class="space-y-1">
+          <template x-for="(s, si) in (typeof g.config === 'string' ? JSON.parse(g.config).series : g.config.series || [])" :key="s.source + (s.label || '') + si">
+            <div class="flex items-center gap-1.5">
+              <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input type="checkbox" :checked="s.enabled !== false" @change="toggleSeries(g.id, si, $event.target.checked)" class="sr-only peer">
+                <div class="w-5 h-3 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[0.5px] after:start-[0.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-primary-500"></div>
+              </label>
+              <span :style="'background:' + s.color + '20;color:' + s.color" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium flex-1 min-w-0">
+                <span :style="'background:' + s.color" class="w-1.5 h-1.5 rounded-full flex-shrink-0"></span>
+                <span class="truncate" x-text="s.label || s.source"></span>
+              </span>
+            </div>
           </template>
         </div>
       </div>
@@ -307,6 +314,21 @@ function linearGraphsPanel() {
         .catch(e => console.error('LG delete error:', e));
     },
 
+    toggleSeries(graphId, seriesIndex, checked) {
+      const g = this.graphs.find(x => x.id === graphId);
+      if (!g) return;
+      const cfg = (typeof g.config === 'string' ? JSON.parse(g.config) : g.config) || {};
+      if (!cfg.series || !cfg.series[seriesIndex]) return;
+      cfg.series[seriesIndex].enabled = checked;
+      g.config = cfg;
+      fetch(`/api/linear-graphs/${graphId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({config: cfg}),
+      }).then(r => { if (r.ok) this.rerenderOverlays(); })
+      .catch(e => console.error('LG series toggle error:', e));
+    },
+
     openAddForm() {
       this.editingId = null;
       this.formName = '';
@@ -325,7 +347,7 @@ function linearGraphsPanel() {
     },
 
     addSeriesRow() {
-      this.formSeries.push({source: 'close', label: '', color: '#3b82f6', line_style: 0});
+      this.formSeries.push({source: 'close', label: '', color: '#3b82f6', line_style: 0, enabled: true});
     },
 
     saveGraph() {
@@ -365,6 +387,7 @@ function linearGraphsPanel() {
             label: s.label || s.source || '',
             color: s.color || '#3b82f6',
             line_style: s.line_style || 0,
+            enabled: true,
           }));
           this.showForm = true;
         })
