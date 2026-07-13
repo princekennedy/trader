@@ -280,6 +280,19 @@ class Notification(db.Model):
     user = db.relationship("User", backref=db.backref("notifications", lazy="dynamic", order_by=created_at.desc()))
 
 
+class LinearGraph(db.Model, AuditMixin):
+    __tablename__ = "linear_graphs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    config = db.Column(db.JSON, default=dict, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    organization = db.relationship("Organization", foreign_keys=[organization_id])
+
+
 class PasswordResetToken(db.Model):
     __tablename__ = "password_reset_tokens"
 

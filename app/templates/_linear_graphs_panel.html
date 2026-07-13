@@ -1,0 +1,411 @@
+<script>
+if (!window.__lgEngine) {
+  window.__lgEngine = {
+    _seriesMap: {},
+    _chart: null,
+    _candleSeries: null,
+
+    setChart(chart) {
+      this._chart = chart;
+    },
+
+    clearAll() {
+      Object.values(this._seriesMap).forEach(arr => {
+        arr.forEach(s => { try { this._chart.removeSeries(s); } catch(e) {} });
+      });
+      this._seriesMap = {};
+    },
+
+    render(candleData, graphs) {
+      if (!this._chart || !candleData || !candleData.length) return;
+      this.clearAll();
+      const active = graphs.filter(g => g.is_active !== false);
+      active.forEach(graph => {
+        const config = (typeof graph.config === 'string' ? JSON.parse(graph.config) : graph.config) || {};
+        const seriesList = config.series || [];
+        if (!seriesList.length) return;
+        const handles = [];
+        seriesList.forEach(s => {
+          const values = candleData.map((c, i) => {
+            const t = c.time || (i + 1) * 86400;
+            const v = this._compute(c, s.source);
+            return { time: t, value: v };
+          });
+          try {
+            const ls = this._chart.addLineSeries({
+              color: s.color || '#3b82f6',
+              lineWidth: s.line_width || 2,
+              lineStyle: s.line_style || 0,
+              title: s.label || s.source,
+              lastValueVisible: true,
+              priceLineVisible: false,
+            });
+            ls.setData(values);
+            handles.push(ls);
+          } catch(e) { console.error('LG line error:', e); }
+        });
+        this._seriesMap[graph.id] = handles;
+      });
+    },
+
+    _compute(c, source) {
+      const o = +c.open, h = +c.high, l = +c.low, cl = +c.close, v = +c.volume;
+      const bd = c.body != null ? +c.body : Math.abs(cl - o);
+      const uw = c.upper_wick != null ? +c.upper_wick : h - Math.max(o, cl);
+      const lw = c.lower_wick != null ? +c.lower_wick : Math.min(o, cl) - l;
+      const rng = h - l;
+      const map = {
+        open: o, high: h, low: l, close: cl, volume: v,
+        body: bd, upper_wick: uw, lower_wick: lw,
+        range: rng,
+        body_ratio: rng > 0 ? (bd / rng) * 100 : 0,
+        upper_wick_ratio: rng > 0 ? (uw / rng) * 100 : 0,
+        lower_wick_ratio: rng > 0 ? (lw / rng) * 100 : 0,
+        hl2: (h + l) / 2,
+        hlc3: (h + l + cl) / 3,
+        ohlc4: (o + h + l + cl) / 4,
+      };
+      return map[source] != null ? map[source] : 0;
+    }
+  };
+}
+</script>
+<div x-data="linearGraphsPanel()" x-init="init()" class="flex gap-4" style="min-height:520px;">
+  <div class="flex-1 min-w-0">
+    <div id="lwc-container-lg" class="w-full" style="height:520px;"></div>
+  </div>
+  <div class="w-80 flex-shrink-0 space-y-3 overflow-y-auto" style="max-height:560px;">
+    <div class="flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-gray-900">Linear Graphs</h3>
+      <div class="flex gap-1">
+        <button @click="showGenerateModal = true" class="px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 transition-colors" title="AI Generate">
+          <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>AI
+        </button>
+        <button @click="openAddForm()" class="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 transition-colors">
+          <i class="fa-solid fa-plus mr-1"></i>Add
+        </button>
+      </div>
+    </div>
+
+    <template x-if="loading">
+      <div class="flex items-center justify-center py-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-lg mr-2"></i><span class="text-xs">Loading...</span></div>
+    </template>
+
+    <template x-if="!loading && !graphs.length">
+      <div class="flex flex-col items-center py-8 text-gray-400">
+        <i class="fa-solid fa-chart-line text-2xl mb-2"></i>
+        <p class="text-xs font-medium">No graphs yet</p>
+        <p class="text-[10px] text-gray-300 mt-1">Add one or use AI to generate</p>
+      </div>
+    </template>
+
+    <template x-for="g in graphs" :key="g.id">
+      <div class="border border-gray-200 rounded-lg p-3 space-y-2" :class="g.is_active === false ? 'opacity-50' : ''">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0">
+            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input type="checkbox" :checked="g.is_active !== false" @change="toggleGraph(g.id, $event.target.checked)" class="sr-only peer">
+              <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+            <span class="text-xs font-medium text-gray-900 truncate" x-text="g.name"></span>
+          </div>
+          <div class="flex gap-1 flex-shrink-0">
+            <button @click="openAnalyzeModal(g)" class="p-1 text-gray-400 hover:text-purple-600 transition-colors" title="Analyze with AI">
+              <i class="fa-solid fa-brain text-[10px]"></i>
+            </button>
+            <button @click="openEditForm(g)" class="p-1 text-gray-400 hover:text-primary-600 transition-colors" title="Edit">
+              <i class="fa-solid fa-pen text-[10px]"></i>
+            </button>
+            <button @click="deleteGraph(g.id, g.name)" class="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+              <i class="fa-solid fa-trash-can text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+        <template x-if="g.description">
+          <p class="text-[10px] text-gray-500 leading-relaxed line-clamp-2" x-text="g.description"></p>
+        </template>
+        <div class="flex flex-wrap gap-1">
+          <template x-for="s in (typeof g.config === 'string' ? JSON.parse(g.config).series : g.config.series || [])" :key="s.source + (s.label || '')">
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium" :style="'background:' + s.color + '20;color:' + s.color">
+              <span :style="'background:' + s.color" class="w-1.5 h-1.5 rounded-full"></span>
+              <span x-text="s.label || s.source"></span>
+            </span>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div x-cloak x-show="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showForm = false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-gray-900" x-text="editingId ? 'Edit Graph' : 'New Graph'"></h3>
+        <button @click="showForm = false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+          <input x-model="formName" type="text" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="e.g. Upper Wicks">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+          <textarea x-model="formDesc" rows="2" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Optional description"></textarea>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-medium text-gray-500">Series</label>
+            <button @click="addSeriesRow()" class="text-xs text-primary-600 hover:text-primary-700 font-medium"><i class="fa-solid fa-plus mr-0.5"></i>Add Series</button>
+          </div>
+          <div class="space-y-2">
+            <template x-for="(s, si) in formSeries" :key="si">
+              <div class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                <select x-model="s.source" class="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white w-24 focus:ring-1 focus:ring-primary-500">
+                  <option value="close">Close</option>
+                  <option value="open">Open</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                  <option value="volume">Volume</option>
+                  <option value="body">Body</option>
+                  <option value="upper_wick">Upper Wick</option>
+                  <option value="lower_wick">Lower Wick</option>
+                  <option value="range">Range</option>
+                  <option value="body_ratio">Body %</option>
+                  <option value="upper_wick_ratio">Upper Wick %</option>
+                  <option value="lower_wick_ratio">Lower Wick %</option>
+                  <option value="hl2">HL/2</option>
+                  <option value="hlc3">HLC/3</option>
+                  <option value="ohlc4">OHLC/4</option>
+                </select>
+                <input x-model="s.label" type="text" class="text-xs border border-gray-200 rounded px-2 py-1.5 w-20 focus:ring-1 focus:ring-primary-500" placeholder="Label">
+                <input x-model="s.color" type="color" class="w-7 h-7 p-0 border border-gray-200 rounded cursor-pointer">
+                <select x-model="s.line_style" class="text-xs border border-gray-200 rounded px-1 py-1.5 bg-white w-16 focus:ring-1 focus:ring-primary-500">
+                  <option value="0">Solid</option>
+                  <option value="1">Dotted</option>
+                  <option value="2">Dashed</option>
+                  <option value="3">Large</option>
+                </select>
+                <button @click="formSeries.splice(si, 1)" class="p-1 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xs"></i></button>
+              </div>
+            </template>
+            <template x-if="!formSeries.length">
+              <p class="text-[10px] text-gray-400 text-center py-3">No series. Click "Add Series" to add one.</p>
+            </template>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showForm = false" class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
+          <button @click="saveGraph()" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors" :disabled="!formName.trim()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Generate Modal -->
+  <div x-cloak x-show="showGenerateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showGenerateModal = false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-gray-900">AI Generate Graph</h3>
+        <button @click="showGenerateModal = false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-3">
+        <p class="text-xs text-gray-500">Describe the indicator lines you want to see on the chart.</p>
+        <textarea x-model="genPrompt" rows="4" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder='e.g. "Plot the upper and lower wicks as two separate lines with different colors, plus the body-to-range ratio."'></textarea>
+        <template x-if="genError">
+          <p class="text-xs text-red-500" x-text="genError"></p>
+        </template>
+        <div class="flex justify-end gap-2">
+          <button @click="showGenerateModal = false" class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
+          <button @click="aiGenerate()" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors" :disabled="genLoading || !genPrompt.trim()">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1" :class="genLoading ? 'fa-spin' : ''"></i>
+            <span x-text="genLoading ? 'Generating...' : 'Generate'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Analyze Modal -->
+  <div x-cloak x-show="showAnalyzeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAnalyzeModal = false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-gray-900">
+          <i class="fa-solid fa-brain text-purple-500 mr-1.5"></i>
+          Analyze: <span x-text="analyzeGraph?.name" class="text-primary-600"></span>
+        </h3>
+        <button @click="showAnalyzeModal = false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Question (optional)</label>
+          <textarea x-model="analyzeQuestion" rows="2" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder='e.g. "What does the upper wick line tell us about selling pressure?"'></textarea>
+        </div>
+        <template x-if="analyzeError">
+          <p class="text-xs text-red-500" x-text="analyzeError"></p>
+        </template>
+        <template x-if="analyzeAnswer">
+          <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap" x-text="analyzeAnswer"></div>
+        </template>
+        <div class="flex justify-between items-center">
+          <button @click="analyzeGraphWithAi()" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors" :disabled="analyzeLoading">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1" :class="analyzeLoading ? 'fa-spin' : ''"></i>
+            <span x-text="analyzeLoading ? 'Analyzing...' : 'Analyze'"></span>
+          </button>
+          <button @click="showAnalyzeModal = false" class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function linearGraphsPanel() {
+  return {
+    graphs: [],
+    loading: false,
+    showForm: false,
+    showGenerateModal: false,
+    showAnalyzeModal: false,
+    editingId: null,
+    formName: '',
+    formDesc: '',
+    formSeries: [],
+    genPrompt: '',
+    genLoading: false,
+    genError: '',
+    analyzeGraph: null,
+    analyzeQuestion: '',
+    analyzeAnswer: '',
+    analyzeLoading: false,
+    analyzeError: '',
+
+    init() {
+      this.fetchGraphs();
+      this.$watch('graphs', () => this.rerenderOverlays());
+    },
+
+    fetchGraphs() {
+      this.loading = true;
+      fetch('/api/linear-graphs')
+        .then(r => r.json())
+        .then(data => { this.graphs = data || []; this.loading = false; })
+        .catch(e => { console.error('LG fetch error:', e); this.loading = false; });
+    },
+
+    toggleGraph(id, checked) {
+      fetch(`/api/linear-graphs/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_active: checked}),
+      }).then(r => { if (r.ok) { const g = this.graphs.find(x => x.id === id); if (g) g.is_active = checked; this.rerenderOverlays(); } })
+      .catch(e => console.error('LG toggle error:', e));
+    },
+
+    deleteGraph(id, name) {
+      if (!confirm(`Delete "${name}"?`)) return;
+      fetch(`/api/linear-graphs/${id}`, {method: 'DELETE'})
+        .then(r => { if (r.ok) { this.graphs = this.graphs.filter(x => x.id !== id); this.rerenderOverlays(); } })
+        .catch(e => console.error('LG delete error:', e));
+    },
+
+    openAddForm() {
+      this.editingId = null;
+      this.formName = '';
+      this.formDesc = '';
+      this.formSeries = [];
+      this.showForm = true;
+    },
+
+    openEditForm(g) {
+      this.editingId = g.id;
+      this.formName = g.name;
+      this.formDesc = g.description || '';
+      const cfg = (typeof g.config === 'string' ? JSON.parse(g.config) : g.config) || {};
+      this.formSeries = (cfg.series || []).map(s => ({...s}));
+      this.showForm = true;
+    },
+
+    addSeriesRow() {
+      this.formSeries.push({source: 'close', label: '', color: '#3b82f6', line_style: 0});
+    },
+
+    saveGraph() {
+      if (!this.formName.trim()) return;
+      const body = {
+        name: this.formName.trim(),
+        description: this.formDesc.trim(),
+        config: {series: this.formSeries},
+      };
+      const url = this.editingId ? `/api/linear-graphs/${this.editingId}` : '/api/linear-graphs';
+      const method = this.editingId ? 'PUT' : 'POST';
+      fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+        .then(r => { if (r.ok) { this.showForm = false; this.fetchGraphs(); } })
+        .catch(e => console.error('LG save error:', e));
+    },
+
+    aiGenerate() {
+      if (!this.genPrompt.trim()) return;
+      this.genLoading = true;
+      this.genError = '';
+      fetch('/api/linear-graphs/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prompt: this.genPrompt.trim()}),
+      })
+        .then(r => r.json().then(d => ({ok: r.ok, data: d})))
+        .then(({ok, data}) => {
+          this.genLoading = false;
+          if (!ok) { this.genError = data.error || 'Generation failed'; return; }
+          this.showGenerateModal = false;
+          this.genPrompt = '';
+          this.editingId = null;
+          this.formName = data.name || '';
+          this.formDesc = data.description || '';
+          this.formSeries = (data.series || []).map(s => ({
+            source: s.source || 'close',
+            label: s.label || s.source || '',
+            color: s.color || '#3b82f6',
+            line_style: s.line_style || 0,
+          }));
+          this.showForm = true;
+        })
+        .catch(e => { this.genLoading = false; this.genError = e.message; });
+    },
+
+    openAnalyzeModal(g) {
+      this.analyzeGraph = g;
+      this.analyzeQuestion = '';
+      this.analyzeAnswer = '';
+      this.analyzeError = '';
+      this.showAnalyzeModal = true;
+    },
+
+    analyzeGraphWithAi() {
+      if (!this.analyzeGraph) return;
+      this.analyzeLoading = true;
+      this.analyzeError = '';
+      this.analyzeAnswer = '';
+      const candleData = window.__candleData || [];
+      fetch(`/api/linear-graphs/${this.analyzeGraph.id}/analyze`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({candles: candleData, question: this.analyzeQuestion.trim()}),
+      })
+        .then(r => r.json().then(d => ({ok: r.ok, data: d})))
+        .then(({ok, data}) => {
+          this.analyzeLoading = false;
+          if (!ok) { this.analyzeError = data.error || 'Analysis failed'; return; }
+          this.analyzeAnswer = data.answer;
+        })
+        .catch(e => { this.analyzeLoading = false; this.analyzeError = e.message; });
+    },
+
+    rerenderOverlays() {
+      const candleData = window.__candleData || [];
+      if (!candleData.length) return;
+      if (window.__lgEngine) {
+        window.__lgEngine.render(candleData, this.graphs);
+      }
+    },
+  };
+}
+</script>
