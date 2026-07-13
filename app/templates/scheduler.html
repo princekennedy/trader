@@ -6,7 +6,7 @@
 
 <div class="flex items-center justify-between mb-5">
   <div>
-    <p class="text-sm text-gray-500">Schedule rules to run automatically and send email alerts on bullish predictions.</p>
+    <p class="text-sm text-gray-500">Schedule rules to run automatically and send email alerts.</p>
   </div>
   <a href="{{ url_for('scheduler.create') }}" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-1.5">
     <i class="fa-solid fa-plus"></i> New Scheduler
@@ -20,13 +20,16 @@
     <div class="flex items-start justify-between mb-2">
       <div class="min-w-0">
         <h3 class="text-sm font-semibold text-gray-900 truncate">{{ s.name }}</h3>
-        <div class="flex items-center gap-2 mt-1">
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
           <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ 'bg-blue-50 text-blue-700' if s.source_type == 'binance' else 'bg-purple-50 text-purple-700' }}">
             <i class="fa-solid {{ 'fa-coins' if s.source_type == 'binance' else 'fa-image' }} mr-0.5"></i>
             {{ s.source_type|title }}
           </span>
-          <span class="text-xs text-gray-400">
-            <i class="fa-regular fa-clock mr-0.5"></i> {{ s.schedule_time.strftime('%H:%M') }}
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
+            <i class="fa-regular fa-clock mr-0.5"></i> {{ schedule_label(s.schedule_config) }}
+          </span>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ 'bg-green-50 text-green-700' if s.notify_on == 'bullish' else 'bg-red-50 text-red-700' if s.notify_on == 'bearish' else 'bg-amber-50 text-amber-700' }}">
+            <i class="fa-regular fa-bell mr-0.5"></i> {{ notify_options.get(s.notify_on, s.notify_on)|title }}
           </span>
         </div>
       </div>
@@ -90,7 +93,7 @@
 <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
   <i class="fa-solid fa-calendar-clock text-5xl text-gray-300 mb-4"></i>
   <h3 class="text-base font-semibold text-gray-900 mb-1">No Schedulers</h3>
-  <p class="text-sm text-gray-500 mb-4">Create a scheduler to automatically evaluate rules and get email alerts on bullish predictions.</p>
+  <p class="text-sm text-gray-500 mb-4">Create a scheduler to automatically evaluate rules and get email alerts on predictions.</p>
   <a href="{{ url_for('scheduler.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">
     <i class="fa-solid fa-plus"></i> Create Scheduler
   </a>
@@ -101,10 +104,7 @@
 
 {% block extra_scripts %}
 <script>
-let deleteId = null;
-
 function confirmDelete(id, name) {
-  deleteId = id;
   document.getElementById('delete-name').textContent = name;
   document.getElementById('delete-form').action = '/scheduler/' + id + '/delete';
   document.getElementById('delete-modal').classList.remove('hidden');

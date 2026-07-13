@@ -253,7 +253,9 @@ class Scheduler(db.Model, AuditMixin):
     name = db.Column(db.String(200), nullable=False)
     source_type = db.Column(db.String(20), nullable=False, default="binance")  # binance or image
     source_config = db.Column(db.JSON, default=dict, nullable=False)
-    schedule_time = db.Column(db.Time, nullable=False)
+    schedule_time = db.Column(db.Time, nullable=True)
+    schedule_config = db.Column(db.JSON, default=dict, nullable=False)
+    notify_on = db.Column(db.String(20), default="bullish", nullable=False)
     email_recipients = db.Column(db.JSON, default=list, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     last_run_at = db.Column(db.DateTime, nullable=True)

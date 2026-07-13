@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime, time as dtime
+from datetime import datetime, time as dtime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, g
 from flask_login import login_required, current_user
 from app import db
@@ -12,6 +12,19 @@ scheduler_bp = Blueprint("scheduler", __name__, url_prefix="/scheduler")
 
 BINANCE_API = "https://api.binance.com"
 
+SCHEDULE_TYPES = {
+    "interval": "Every N minutes/hours/days/weeks",
+    "daily": "Daily at specific time",
+    "weekly": "Weekly on specific day & time",
+    "monthly": "Monthly on specific day & time",
+}
+
+NOTIFY_OPTIONS = {
+    "bullish": "Bullish only",
+    "bearish": "Bearish only",
+    "both": "Both bullish and bearish",
+}
+
 
 @scheduler_bp.route("/")
 @login_required
@@ -20,7 +33,9 @@ def index():
     schedulers = Scheduler.query.filter_by(
         organization_id=g.current_org.id
     ).order_by(Scheduler.created_at.desc()).all()
-    return render_template("scheduler.html", schedulers=schedulers)
+    return render_template("scheduler.html", schedulers=schedulers,
+                           notify_options=NOTIFY_OPTIONS,
+                           schedule_label=_get_schedule_label)
 
 
 @scheduler_bp.route("/create", methods=["GET", "POST"])
@@ -39,8 +54,6 @@ def create():
     data = request.form
     name = data.get("name", "").strip()
     source_type = data.get("source_type", "binance")
-    schedule_hr = data.get("schedule_hour", "09")
-    schedule_min = data.get("schedule_minute", "00")
     recipient_str = data.get("email_recipients", "").strip()
     rule_ids = request.form.getlist("rule_ids")
 
@@ -71,10 +84,13 @@ def create():
         flash("At least one email recipient is required", "danger")
         return redirect(url_for("scheduler.create"))
 
-    try:
-        schedule_time = dtime(int(schedule_hr), int(schedule_min))
-    except ValueError:
-        flash("Invalid schedule time", "danger")
+    notify_on = data.get("notify_on", "bullish")
+    if notify_on not in ("bullish", "bearish", "both"):
+        notify_on = "bullish"
+
+    schedule_type = data.get("schedule_type", "daily")
+    schedule_config = _build_schedule_config(data, schedule_type)
+    if schedule_config is None:
         return redirect(url_for("scheduler.create"))
 
     scheduler = Scheduler(
@@ -82,7 +98,8 @@ def create():
         name=name,
         source_type=source_type,
         source_config=source_config,
-        schedule_time=schedule_time,
+        schedule_config=schedule_config,
+        notify_on=notify_on,
         email_recipients=recipients,
         created_by_id=current_user.id,
         updated_by_id=current_user.id,
@@ -124,10 +141,6 @@ def edit(sched_id):
     data = request.form
     scheduler.name = data.get("name", "").strip()
     scheduler.source_type = data.get("source_type", "binance")
-    schedule_hr = data.get("schedule_hour", "09")
-    schedule_min = data.get("schedule_minute", "00")
-    recipient_str = data.get("email_recipients", "").strip()
-    rule_ids = request.form.getlist("rule_ids")
 
     if not scheduler.name:
         flash("Name is required", "danger")
@@ -142,15 +155,19 @@ def edit(sched_id):
         job_id = data.get("job_id", "").strip()
         scheduler.source_config = {"job_id": int(job_id)} if job_id else {}
 
-    scheduler.email_recipients = [r.strip() for r in recipient_str.split(",") if r.strip()]
-    try:
-        scheduler.schedule_time = dtime(int(schedule_hr), int(schedule_min))
-    except ValueError:
-        flash("Invalid schedule time", "danger")
+    notify_on = data.get("notify_on", "bullish")
+    scheduler.notify_on = notify_on if notify_on in ("bullish", "bearish", "both") else "bullish"
+
+    schedule_type = data.get("schedule_type", "daily")
+    schedule_config = _build_schedule_config(data, schedule_type)
+    if schedule_config is None:
         return redirect(url_for("scheduler.edit", sched_id=sched_id))
+    scheduler.schedule_config = schedule_config
+
+    scheduler.email_recipients = [r.strip() for r in data.get("email_recipients", "").split(",") if r.strip()]
 
     scheduler.rules = []
-    for rid in rule_ids:
+    for rid in request.form.getlist("rule_ids"):
         rule = Rule.query.filter_by(id=int(rid), organization_id=g.current_org.id).first()
         if rule:
             scheduler.rules.append(rule)
@@ -187,6 +204,71 @@ def toggle(sched_id):
     return jsonify({"ok": True, "is_active": scheduler.is_active})
 
 
+def _build_schedule_config(data, schedule_type):
+    if schedule_type == "interval":
+        try:
+            value = int(data.get("interval_value", "60"))
+            if value < 1:
+                value = 1
+        except ValueError:
+            flash("Invalid interval value", "danger")
+            return None
+        unit = data.get("interval_unit", "minutes")
+        if unit not in ("minutes", "hours", "days", "weeks"):
+            unit = "minutes"
+        return {"type": "interval", "value": value, "unit": unit}
+
+    hr = data.get("schedule_hour", "09")
+    minute = data.get("schedule_minute", "00")
+    try:
+        time_str = f"{int(hr):02d}:{int(minute):02d}"
+    except ValueError:
+        flash("Invalid schedule time", "danger")
+        return None
+
+    if schedule_type == "daily":
+        return {"type": "daily", "time": time_str}
+    elif schedule_type == "weekly":
+        day = data.get("schedule_day", "1")
+        try:
+            day = int(day)
+        except ValueError:
+            day = 1
+        return {"type": "weekly", "time": time_str, "day": day}
+    elif schedule_type == "monthly":
+        day = data.get("schedule_day", "1")
+        try:
+            day = int(day)
+            if day < 1 or day > 31:
+                day = 1
+        except ValueError:
+            day = 1
+        return {"type": "monthly", "time": time_str, "day": day}
+    else:
+        flash("Invalid schedule type", "danger")
+        return None
+
+
+def _get_schedule_label(sc):
+    if not sc:
+        return "Unknown"
+    st = sc.get("type", "daily")
+    if st == "interval":
+        return f"Every {sc['value']} {sc.get('unit', 'minutes')}"
+    time_str = sc.get("time", "09:00")
+    if st == "daily":
+        return f"Daily at {time_str}"
+    if st == "weekly":
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        day_label = days[sc.get("day", 1) % 7]
+        return f"{day_label} at {time_str}"
+    if st == "monthly":
+        return f"Day {sc.get('day', 1)} at {time_str}"
+    return "Unknown"
+
+
+# ---- Binance fetching ----
+
 def _fetch_binance_candles(symbol, interval, limit):
     try:
         resp = requests.get(
@@ -209,25 +291,63 @@ def _fetch_binance_candles(symbol, interval, limit):
     } for k in data]
 
 
+# ---- Scheduler tick / background ----
+
 def scheduler_tick(app):
     with app.app_context():
         now = datetime.now()
-        current_time = now.time()
-        today = now.date()
-
-        due = Scheduler.query.filter(
-            Scheduler.is_active == True,
-            Scheduler.schedule_time <= current_time,
-            (Scheduler.last_run_at == None) | (db.func.date(Scheduler.last_run_at) < today),
-        ).all()
+        due = Scheduler.query.filter(Scheduler.is_active == True).all()
 
         for sched in due:
-            try:
-                _run_scheduler(sched)
-                sched.last_run_at = now
-                db.session.commit()
-            except Exception as e:
-                app.logger.error("Scheduler %d tick error: %s", sched.id, e)
+            if _is_due(sched, now):
+                try:
+                    _run_scheduler(sched)
+                    sched.last_run_at = now
+                    db.session.commit()
+                except Exception as e:
+                    app.logger.error("Scheduler %d tick error: %s", sched.id, e)
+
+
+def _is_due(sched, now):
+    sc = sched.schedule_config or {}
+    st = sc.get("type", "daily")
+
+    if st == "interval":
+        value = sc.get("value", 60)
+        unit = sc.get("unit", "minutes")
+        if sched.last_run_at is None:
+            return True
+        delta = timedelta(**{unit: value})
+        return (now - sched.last_run_at) >= delta
+
+    current_time = now.time()
+    target_time = _parse_time(sc.get("time", "09:00"))
+    if target_time is None:
+        return False
+    if current_time < target_time:
+        return False
+
+    if st == "weekly":
+        day = sc.get("day", 1) % 7
+        if now.weekday() != day:
+            return False
+    elif st == "monthly":
+        day = sc.get("day", 1)
+        if now.day != day:
+            return False
+
+    last = sched.last_run_at
+    if last is None:
+        return True
+    return last.date() < now.date()
+
+
+def _parse_time(t):
+    try:
+        parts = t.split(":")
+        return dtime(int(parts[0]), int(parts[1]))
+    except (ValueError, IndexError):
+        return None
 
 
 def _run_scheduler(sched):
@@ -267,7 +387,13 @@ def _run_scheduler(sched):
                 else:
                     bearish_votes += 1
 
-    if bullish_votes > bearish_votes:
+    notify = sched.notify_on or "bullish"
+    should_send = (
+        (notify == "bullish" and bullish_votes > bearish_votes) or
+        (notify == "bearish" and bearish_votes > bullish_votes) or
+        (notify == "both" and bullish_votes != bearish_votes)
+    )
+    if should_send:
         _send_alert(sched, candles, bullish_votes, bearish_votes)
 
 
@@ -275,6 +401,7 @@ def _send_alert(sched, candles, bullish_votes, bearish_votes):
     last = candles[-1]
     source_label = sched.source_config.get("symbol", "chart") if sched.source_type == "binance" else f"job #{sched.source_config.get('job_id', '?')}"
     rule_names = [r.name for r in sched.rules]
+    direction = "bullish" if bullish_votes > bearish_votes else "bearish"
 
     for email in sched.email_recipients:
         html = render_template(
@@ -288,4 +415,5 @@ def _send_alert(sched, candles, bullish_votes, bearish_votes):
             bullish_votes=bullish_votes,
             bearish_votes=bearish_votes,
         )
-        send_email(email, f"[Bullish Alert] {sched.name} - {source_label}", html)
+        subject = f"[{direction.title()} Alert] {sched.name} - {source_label}"
+        send_email(email, subject, html)
