@@ -82,7 +82,8 @@ def create_app():
             pass
         return {"unread_notifications_count": 0}
 
-    if not app.config.get("TESTING") and not app.config.get("SCHEDULER_DISABLED"):
+    scheduler_disabled = app.config.get("SCHEDULER_DISABLED") or os.getenv("SCHEDULER_DISABLED", "").lower() in ("true", "1", "yes")
+    if not app.config.get("TESTING") and not scheduler_disabled:
         _init_scheduler(app)
 
     return app
