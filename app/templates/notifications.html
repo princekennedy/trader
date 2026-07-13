@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block heading %}Notifications{% endblock %}
+{% block subtitle %}All your in-app alerts{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  {% if notifications %}
+  <div class="flex justify-end mb-4">
+    <form method="POST" action="{{ url_for('notifications.mark_all_read') }}">
+      <button class="text-sm text-primary-600 hover:text-primary-700 font-medium"><i class="fa-regular fa-check-double mr-1"></i>Mark all as read</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="space-y-2">
+    {% for n in notifications %}
+    <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-start gap-3 {{ 'opacity-60' if n.is_read else '' }}">
+      <i class="fa-solid fa-circle mt-1.5 text-[8px] {{ 'text-green-500' if n.type == 'bullish' else 'text-red-500' if n.type == 'bearish' else 'text-primary-500' }}"></i>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-gray-900 {{ 'font-semibold' if not n.is_read else '' }}">{{ n.title }}</p>
+          <span class="text-[11px] text-gray-400 whitespace-nowrap ml-2">{{ n.created_at.strftime('%b %d, %Y %H:%M') }}</span>
+        </div>
+        <p class="text-sm text-gray-500 mt-0.5">{{ n.message }}</p>
+      </div>
+      {% if not n.is_read %}
+      <form method="POST" action="{{ url_for('notifications.mark_read', id=n.id) }}">
+        <button class="text-gray-300 hover:text-primary-500 transition-colors text-xs mt-1"><i class="fa-regular fa-circle-check"></i></button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl border border-gray-200 px-6 py-12 text-center">
+      <i class="fa-regular fa-bell-slash text-4xl text-gray-300 mb-3 block"></i>
+      <p class="text-gray-500 font-medium">No notifications yet</p>
+      <p class="text-sm text-gray-400 mt-1">When your scheduler triggers an alert, it will appear here.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if pagination and pagination.pages > 1 %}
+  <div class="flex justify-center gap-2 mt-6">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('notifications.index', page=pagination.prev_num) }}" class="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">&larr; Previous</a>
+    {% endif %}
+    <span class="px-3 py-1.5 text-sm text-gray-500">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+    <a href="{{ url_for('notifications.index', page=pagination.next_num) }}" class="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">Next &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

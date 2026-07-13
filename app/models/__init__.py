@@ -264,6 +264,22 @@ class Scheduler(db.Model, AuditMixin):
     rules = db.relationship("Rule", secondary=scheduler_rules, lazy="select")
 
 
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=True)
+    type = db.Column(db.String(20), default="info")
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    link = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    user = db.relationship("User", backref=db.backref("notifications", lazy="dynamic", order_by=created_at.desc()))
+
+
 class PasswordResetToken(db.Model):
     __tablename__ = "password_reset_tokens"
 

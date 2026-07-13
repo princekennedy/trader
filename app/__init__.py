@@ -63,6 +63,18 @@ def create_app():
         else:
             g.current_org = None
 
+    @app.context_processor
+    def inject_notification_count():
+        from flask_login import current_user
+        from app.models import Notification
+        try:
+            if current_user.is_authenticated:
+                count = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
+                return {"unread_notifications_count": count}
+        except (RuntimeError, AttributeError):
+            pass
+        return {"unread_notifications_count": 0}
+
     if not app.config.get("TESTING") and not app.config.get("SCHEDULER_DISABLED"):
         _init_scheduler(app)
 

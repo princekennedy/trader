@@ -3,7 +3,7 @@ from datetime import datetime, time as dtime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, g
 from flask_login import login_required, current_user
 from app import db
-from app.models import Organization, Rule, ExtractionJob, Scheduler
+from app.models import Organization, Rule, ExtractionJob, Scheduler, Notification
 from app.utils.auth import org_required
 from app.routes.predict import evaluate_rule
 from app.utils.email import send_email
@@ -417,3 +417,16 @@ def _send_alert(sched, candles, bullish_votes, bearish_votes):
         )
         subject = f"[{direction.title()} Alert] {sched.name} - {source_label}"
         send_email(email, subject, html)
+
+    user_id = sched.created_by_id
+    if user_id:
+        notif = Notification(
+            user_id=user_id,
+            organization_id=sched.organization_id,
+            title=f"{direction.title()} Alert",
+            message=f"Scheduler \"{sched.name}\" detected {bullish_votes}B / {bearish_votes}B on {source_label}",
+            type=direction,
+            link="/scheduler/",
+        )
+        db.session.add(notif)
+        db.session.commit()

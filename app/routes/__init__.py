@@ -11,6 +11,7 @@ def register_blueprints(app):
     from app.routes.binance import binance_bp
     from app.routes.predict import predict_bp
     from app.routes.scheduler import scheduler_bp
+    from app.routes.notifications import notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(org_bp)
@@ -24,6 +25,7 @@ def register_blueprints(app):
     app.register_blueprint(binance_bp)
     app.register_blueprint(predict_bp)
     app.register_blueprint(scheduler_bp)
+    app.register_blueprint(notifications_bp)
 
     from app.commands import seed_command
     app.cli.add_command(seed_command)

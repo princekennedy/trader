@@ -43,7 +43,7 @@
 </head>
 
 <body class="h-full">
-    <div x-data="{ sidebarOpen: window.innerWidth >= 1024, mobileOpen: false }" class="flex h-full" x-init="">
+    <div x-data="{ sidebarOpen: window.innerWidth >= 1024, mobileOpen: false, notifOpen: false, notifCount: {{ unread_notifications_count }}, notifList: [] }" class="flex h-full" x-init="">
         <div x-cloak x-show="mobileOpen" x-transition:enter="transition-opacity ease-linear duration-300" x-transition:leave="transition-opacity ease-linear duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0" class="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden" x-on:click="mobileOpen = false"></div>
 
@@ -102,6 +102,11 @@
                 {% endif %}
 
                 <p class="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-500 mt-6 mb-2">System</p>
+                <a href="{{ url_for('notifications.index') }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint and request.endpoint.startswith('notifications') else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
+                    <i class="fa-solid fa-bell w-5 text-center text-sm"></i>
+                    <span>Notifications</span>
+                    <span x-show="notifCount > 0" x-text="notifCount" class="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center"></span>
+                </a>
                 <a href="{{ url_for('main.settings') }}" class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-primary-600 text-white' if request.endpoint == 'main.settings' else 'text-sidebar-400 hover:bg-sidebar-800 hover:text-white' }}">
                     <i class="fa-solid fa-gear w-5 text-center text-sm"></i>
                     <span>Settings</span>
@@ -138,10 +143,40 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button class="relative text-gray-400 hover:text-gray-600 transition-colors">
-            <i class="fa-solid fa-bell text-lg"></i>
-            <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">3</span>
-          </button>
+                    <div class="relative" x-data>
+            <button x-on:click="notifOpen = !notifOpen; if(notifOpen){fetch('/notifications/api/unread').then(r=>r.json()).then(d=>notifList=d)}" class="relative text-gray-400 hover:text-gray-600 transition-colors">
+              <i class="fa-solid fa-bell text-lg"></i>
+              <span x-show="notifCount > 0" x-text="notifCount" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"></span>
+            </button>
+            <div x-cloak x-show="notifOpen" x-on:click.outside="notifOpen = false" class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+              <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-900">Notifications</span>
+                <div class="flex items-center gap-2">
+                  <button x-show="notifCount > 0" x-on:click="fetch('/notifications/read-all',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>r.json()).then(()=>{notifCount=0;notifList=[]})" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Mark all read</button>
+                  <a href="{{ url_for('notifications.index') }}" class="text-xs text-gray-400 hover:text-gray-600"><i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+              </div>
+              <div class="max-h-80 overflow-y-auto">
+                <template x-for="n in notifList" :key="n.id">
+                  <div class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <div class="flex items-start gap-3">
+                      <i class="fa-solid fa-circle mt-1 text-[8px]" :class="n.type === 'bullish' ? 'text-green-500' : n.type === 'bearish' ? 'text-red-500' : 'text-primary-500'"></i>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate" x-text="n.title"></p>
+                        <p class="text-xs text-gray-500 mt-0.5 line-clamp-2" x-text="n.message"></p>
+                        <p class="text-[11px] text-gray-400 mt-1" x-text="new Date(n.created_at).toLocaleString()"></p>
+                      </div>
+                      <button x-on:click="fetch('/notifications/'+n.id+'/read',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>r.json()).then(()=>{notifCount = Math.max(0, notifCount-1); n.hidden=true}); $el.closest('div').remove()" class="text-gray-300 hover:text-gray-500 text-xs"><i class="fa-solid fa-check"></i></button>
+                    </div>
+                  </div>
+                </template>
+                <div x-show="notifList.length === 0" class="px-4 py-8 text-center text-sm text-gray-400">
+                  <i class="fa-solid fa-bell-slash text-2xl mb-2 block"></i>
+                  No new notifications
+                </div>
+              </div>
+            </div>
+          </div>
                     <div class="h-8 w-px bg-gray-200"></div>
                     <span class="text-sm text-gray-600 hidden sm:block">
             <i class="fa-solid fa-circle text-green-500 text-[8px] align-middle mr-1.5"></i>Live
