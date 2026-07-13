@@ -5,7 +5,12 @@
 {% endblock %}
 {% block extra_right_panel %}{% include "_right_panel.html" %}{% endblock %}
 {% block title %}Job #{{ job.id }}{% endblock %}
-{% block heading %}Job #{{ job.id }}{% endblock %}
+{% block heading %}
+  Job #{{ job.id }}
+  <button @click="showJobDetails = true" class="ml-2 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors align-middle">
+    <i class="fa-solid fa-circle-info mr-1"></i>Details
+  </button>
+{% endblock %}
 {% block subtitle %}{{ job.filename }}{% endblock %}
 {% block content %}
 {% set preview_url = url_for('charts.uploaded_file', object_name=job.object_name) if job.object_name else '' %}
@@ -16,19 +21,17 @@
   previewUrl: {{ preview_url|tojson }},
   fetchUrl: {{ export_url|tojson }},
   candleData: {{ candles_data|tojson }},
-  showJobDetails: true
+  showJobDetails: false
 }'>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <div :class="showJobDetails ? &apos;lg:col-span-2&apos; : &apos;lg:col-span-3&apos;" class="bg-white rounded-xl border border-gray-200 flex flex-col">
-    {% include "_chart_tabs.html" %}
-  </div>
+<div class="bg-white rounded-xl border border-gray-200 flex flex-col">
+  {% include "_chart_tabs.html" %}
+</div>
 
-  <div x-show="showJobDetails" class="bg-white rounded-xl border border-gray-200 p-5 h-fit">
+<div x-cloak x-show="showJobDetails" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showJobDetails = false">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-base font-semibold text-gray-900">Job Details</h3>
-      <button @click="showJobDetails = false" class="text-gray-400 hover:text-gray-600 transition-colors" title="Hide panel">
-        <i class="fa-solid fa-xmark text-lg"></i>
-      </button>
+      <button @click="showJobDetails = false" class="text-gray-400 hover:text-gray-600 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
     </div>
     <dl class="space-y-3 text-sm">
       <div class="flex justify-between">
@@ -67,10 +70,6 @@
       </a>
     </div>
   </div>
-
-  <button x-show="!showJobDetails" @click="showJobDetails = true" class="fixed bottom-6 right-6 z-40 w-12 h-12 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center text-gray-500 hover:text-gray-700 hover:shadow-xl transition-all" title="Show job details">
-    <i class="fa-solid fa-circle-info text-lg"></i>
-  </button>
 </div>
 </div>
 {% endblock %}
