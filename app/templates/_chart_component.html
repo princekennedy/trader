@@ -10,6 +10,43 @@ window.chartView = {
   switchTab(tab) {
     this.activeTab = tab;
     if (tab === 'graph') this.loadChart();
+    if (tab === 'linear_graphs') {
+      window.__candleData = this.candleData;
+      setTimeout(() => this.switchToLinearGraphs(), 50);
+    }
+  },
+
+  switchToLinearGraphs() {
+    const el = document.getElementById('lwc-container-lg');
+    if (!el || !this.candleData || !this.candleData.length) return;
+    if (window.__lgChartInstance) {
+      try { window.__lgChartInstance.remove(); } catch(e) {}
+      window.__lgChartInstance = null;
+    }
+    el.innerHTML = '';
+    const chart = LightweightCharts.createChart(el, {
+      height: 500,
+      layout: { textColor: '#333', background: { type: 'solid', color: '#fff' } },
+      grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+      rightPriceScale: { borderColor: '#e5e5e5' },
+      timeScale: { borderColor: '#e5e5e5', visible: false },
+      crosshair: { mode: 0 },
+    });
+    const series = chart.addCandlestickSeries({
+      upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626',
+      wickUpColor: '#16a34a', wickDownColor: '#dc2626',
+    });
+    series.setData(this.candleData.map((c, i) => ({
+      time: c.time || (i + 1) * 86400,
+      open: c.open, high: c.high, low: c.low, close: c.close,
+    })));
+    chart.timeScale().fitContent();
+    window.__lgChartInstance = chart;
+    if (window.__lgEngine) {
+      window.__lgEngine.setChart(chart);
+      const lgPanel = document.querySelector('[x-data="linearGraphsPanel()"]');
+      if (lgPanel && lgPanel.__x) lgPanel.__x.$data.rerenderOverlays();
+    }
   },
 
   loadChart() {
@@ -20,6 +57,7 @@ window.chartView = {
           .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
           .then(data => {
             this.candleData = data.candles || data || [];
+            window.__candleData = this.candleData;
             if (this.candleData && this.candleData.length) this.renderChart();
           })
           .catch(e => { console.error('Chart fetch error:', e); this.chartRendered = true; });

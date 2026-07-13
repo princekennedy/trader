@@ -9,6 +9,9 @@
     <button @click="switchTab('graph')" :class="activeTab === 'graph' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
       <i class="fa-solid fa-chart-line mr-1.5"></i>Graph
     </button>
+    <button @click="switchTab('linear_graphs')" :class="activeTab === 'linear_graphs' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors">
+      <i class="fa-solid fa-chart-scatter mr-1.5"></i>Linear Graphs
+    </button>
   </nav>
 </div>
 <div class="flex-1 p-5 overflow-auto">
@@ -80,5 +83,9 @@
       <p class="text-sm font-medium" x-text="chartRendered ? 'No candle data available' : 'Loading chart data...'"></p>
     </div>
     <div id="lwc-container" class="w-full" x-show="candleData && candleData.length"></div>
+  </div>
+
+  <div x-show="activeTab === 'linear_graphs'" x-cloak>
+    {% include "_linear_graphs_panel.html" %}
   </div>
 </div>
